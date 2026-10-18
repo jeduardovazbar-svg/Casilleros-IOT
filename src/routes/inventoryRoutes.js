@@ -8,5 +8,6 @@ router.post('/withdraw', InventoryController.withdraw);
 
 // POST /api/inventory/restock (Reabastecimiento exclusivo para Admin)
 router.post('/restock', InventoryController.restock);
+router.post('/checkout', InventoryController.checkout);
 
 module.exports = router;

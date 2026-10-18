@@ -1,0 +1,113 @@
+body { 
+  font-family: 'Inter', system-ui, sans-serif;
+  /* Gradiente simplificado mucho más rápido de renderizar */
+  background: linear-gradient(135deg, #dbeafe 0%, #e0e7ff 50%, #f1f5f9 100%);
+  background-attachment: fixed;
+  min-height: 100vh;
+  color: #0f172a;
+}
+
+.grid-dense { 
+  grid-auto-flow: dense !important; 
+}
+
+.size-S  { grid-column: span 1 !important; grid-row: span 1 !important; min-height: 155px; }
+.size-M  { grid-column: span 2 !important; grid-row: span 1 !important; min-height: 155px; }
+.size-L  { grid-column: span 1 !important; grid-row: span 2 !important; min-height: 325px; }
+.size-XL { grid-column: span 2 !important; grid-row: span 2 !important; min-height: 325px; }
+
+/* 1. Tarjetas de casilleros optimizadas (Sin backdrop-filter continuo) */
+.liquid-glass {
+  background: rgba(255, 255, 255, 0.82) !important; /* Más opaco para simular el vidrio sin calcular blur */
+  border: 1.5px solid rgba(255, 255, 255, 0.95) !important;
+  box-shadow: 
+    0 8px 20px -4px rgba(100, 116, 139, 0.12),
+    inset 0 1.5px 1px 0 rgba(255, 255, 255, 1),
+    inset 0 -1px 2px 0 rgba(148, 163, 184, 0.15) !important;
+  transform: translateZ(0); /* Aceleración por hardware ligera */
+}
+
+/* 2. El desenfoque real déjalo EXCLUSIVAMENTE para los modales flotantes */
+#modal-withdraw > div,
+#modal-admin > div,
+#modal-logs > div,
+#modal-create-user > div,
+#modal-stats > div {
+  background: rgba(255, 255, 255, 0.75) !important;
+  backdrop-filter: blur(16px) !important;
+  -webkit-backdrop-filter: blur(16px) !important;
+}
+
+/* Botones estilo pastilla */
+.glass-btn {
+  background: rgba(255, 255, 255, 0.85) !important;
+  border: 1px solid rgba(255, 255, 255, 1) !important;
+  box-shadow: 0 2px 6px rgba(148, 163, 184, 0.15), inset 0 1px 0 #ffffff !important;
+  transition: transform 0.1s ease, box-shadow 0.1s ease;
+}
+
+.glass-btn:hover {
+  background: #ffffff !important;
+  box-shadow: 0 4px 12px rgba(148, 163, 184, 0.22) !important;
+}
+
+.glass-btn:active {
+  transform: scale(0.97);
+}
+
+/* Inputs */
+.glass-input {
+  background: rgba(255, 255, 255, 0.8) !important;
+  border: 1px solid rgba(203, 213, 225, 0.9) !important;
+  color: #0f172a;
+}
+.glass-input:focus {
+  background: #ffffff !important;
+  border-color: #38bdf8 !important;
+}
+
+/* Animación de respiración/flotación para el mayordomo */
+@keyframes bot-float {
+  0%, 100% { transform: translateY(0px) rotate(0deg); }
+  50% { transform: translateY(-8px) rotate(-1deg); }
+}
+
+.animate-bot {
+  animation: bot-float 3.5s ease-in-out infinite;
+}
+
+/* Pico / Cola del globo de texto apuntando al bot */
+.speech-bubble {
+  position: relative;
+}
+
+/* En pantallas medianas/grandes el pico apunta hacia la izquierda (al bot) */
+@media (min-width: 640px) {
+  .speech-bubble::before {
+    content: '';
+    position: absolute;
+    top: 36px;
+    left: -12px;
+    width: 0;
+    height: 0;
+    border-top: 10px solid transparent;
+    border-bottom: 10px solid transparent;
+    border-right: 12px solid rgba(255, 255, 255, 0.95);
+    filter: drop-shadow(-2px 2px 2px rgba(100, 116, 139, 0.08));
+  }
+}
+
+/* En pantallas muy compactas (móvil) el pico apunta hacia arriba */
+@media (max-width: 639px) {
+  .speech-bubble::before {
+    content: '';
+    position: absolute;
+    top: -12px;
+    left: 40px;
+    width: 0;
+    height: 0;
+    border-left: 10px solid transparent;
+    border-right: 10px solid transparent;
+    border-bottom: 12px solid rgba(255, 255, 255, 0.95);
+  }
+}

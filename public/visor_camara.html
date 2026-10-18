@@ -1,0 +1,55 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <title>Visor de Seguridad - Casilleros</title>
+    <style>
+        body { font-family: sans-serif; text-align: center; background: #222; color: white; }
+        #camera-feed { max-width: 100%; height: auto; border: 3px solid #4CAF50; border-radius: 8px; margin-top: 20px;}
+        .status { padding: 10px; background: #333; margin: 10px; border-radius: 5px; }
+    </style>
+</head>
+<body>
+    <h1>Visor en Tiempo Real</h1>
+    <div class="status" id="status-text">Esperando apertura de casillero...</div>
+    
+    <!-- Aquí es donde se pintará la foto/video de la ESP32-CAM -->
+    <img id="camera-feed" src="" alt="La cámara está apagada" style="display: none;">
+
+    <script>
+        // Conectar al WebSocket de tu servidor Node.js
+        const ws = new WebSocket('ws://192.168.100.142:3000');
+        const imgElement = document.getElementById('camera-feed');
+        const statusText = document.getElementById('status-text');
+
+        ws.onopen = () => {
+            console.log("Conectado al servidor de casilleros");
+        };
+
+        ws.onmessage = (event) => {
+            // Si recibimos un Blob (Datos binarios), es una foto de la ESP32-CAM
+            if (event.data instanceof Blob) {
+                imgElement.style.display = 'inline-block';
+                statusText.innerText = "Transmisión en vivo: Casillero Abierto";
+                
+                const imageUrl = URL.createObjectURL(event.data);
+                imgElement.src = imageUrl;
+                
+                // Liberar memoria para no crashear el navegador
+                imgElement.onload = () => URL.revokeObjectURL(imageUrl);
+            } 
+            // Si recibimos texto, es la telemetría normal (puerta abierta/cerrada)
+            else {
+                try {
+                    const data = JSON.parse(event.data);
+                    // Ocultar cámara si reporta cerrado
+                    if (data.type === 'DOOR_STATUS_UPDATE' && data.status === 'cerrada') {
+                        imgElement.style.display = 'none';
+                        statusText.innerText = "Esperando apertura de casillero...";
+                    }
+                } catch(e) {}
+            }
+        };
+    </script>
+</body>
+</html>

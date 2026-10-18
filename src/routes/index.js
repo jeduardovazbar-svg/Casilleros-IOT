@@ -7,11 +7,13 @@ const lockerRoutes = require('./lockerRoutes');
 const inventoryRoutes = require('./inventoryRoutes');
 const reportRoutes = require('./reportRoutes');
 const statsRoutes = require('./statsRoutes');
+const userRoutes = require('./userRoutes');
 
 router.use('/auth', authRoutes);
 router.use('/lockers', lockerRoutes);
 router.use('/inventory', inventoryRoutes);
 router.use('/reports', reportRoutes);
 router.use('/stats', statsRoutes);
+router.use('/users', userRoutes);
 
 module.exports = router;
