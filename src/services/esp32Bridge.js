@@ -60,7 +60,7 @@ const Esp32Bridge = {
               if (status === 'abierta') {
                 console.log(`[CÁMARA] Ordenando START_CAMERA para casillero ${box}`);
                 esp32CamSocket.send(JSON.stringify({ command: 'START_CAMERA', box: box }));
-              } else if (status === 'cerrada' || status === 'alerta_abierta') {
+              } else if (status === 'cerrada') {
                 console.log(`[CÁMARA] Ordenando STOP_CAMERA para casillero ${box}`);
                 esp32CamSocket.send(JSON.stringify({ command: 'STOP_CAMERA', box: box }));
               }

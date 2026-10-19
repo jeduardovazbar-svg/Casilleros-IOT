@@ -18,8 +18,6 @@ const promoPlaylist = [
 ];
 let currentVideoIndex = 0;
 
-// En tu app.js
-
 function setupScreensaverVideo() {
   const videoEl = document.getElementById('screensaver-video');
   const ambientEl = document.getElementById('screensaver-video-ambient');
@@ -558,104 +556,6 @@ async function openStatsModal() {
   }
 }
 
-// ==========================================
-// MÓDULO: DIÁLOGO CON EL MAYORDOMO (BYTE)
-// ==========================================
-let currentTutorialStep = 0;
-
-const botDialogs = [
-  {
-    tag: 'Presentación',
-    bubbleTitle: '¡Hola! Qué gusto verte.',
-    message: 'Soy <strong>Byte</strong>, tu mayordomo digital. Me encargo de la comunicación con las placas de relés y los sensores para que retirar tus materiales sea facilísimo y seguro.',
-    hint: '¿Es tu primera vez usando el casillero? Te explico en tres pasos rápidos.',
-    buttonText: '¡Cuéntame cómo funciona!'
-  },
-  {
-    tag: 'Paso 1: Acceso',
-    bubbleTitle: 'Primero, identifícate en la pantalla.',
-    message: 'En cuanto llegues a la estación, introduce tu <strong>PIN personal de 4 dígitos</strong> en el teclado numérico. Yo validaré tus permisos de inmediato.',
-    hint: '💡 Si eres empleado, solo te mostraré tu casillero asignado. Si eres admin, verás todo el panel.',
-    buttonText: 'Entendido, ¿qué sigue?'
-  },
-  {
-    tag: 'Paso 2: Selección',
-    bubbleTitle: 'Elige tu casillero y la cantidad.',
-    message: 'Toca la tarjeta del casillero que necesitas. Podrás ajustar con los botones <strong>(+) y (-)</strong> las piezas exactas que vas a llevarte y agregarlas al carrito.',
-    hint: '📦 Descontaremos el inventario en la base de datos automáticamente al confirmar.',
-    buttonText: 'De acuerdo, ¿y cómo abre?'
-  },
-  {
-    tag: 'Paso 3: Mecanismo',
-    bubbleTitle: '¡La compuerta saltará sola hacia ti!',
-    message: 'Le enviaré un pulso eléctrico al cerrojo industrial para destrabar la garra y la puerta <strong>brincará hacia afuera</strong>. Toma tu insumo y simplemente empújala de nuevo hasta escuchar el <em>clic</em>.',
-    hint: '🚪 Mi microswitch integrado me avisará cuando esté cerrada y guardaré la bitácora.',
-    buttonText: '¡Excelente, empecemos!'
-  }
-];
-
-function renderTutorialStep() {
-  const step = botDialogs[currentTutorialStep];
-  document.getElementById('dialog-tag').innerText = step.tag;
-
-  const bubble = document.getElementById('dialog-bubble');
-  bubble.innerHTML = `
-    <h4 class="text-base font-black text-slate-800 tracking-tight">${step.bubbleTitle}</h4>
-    <p class="text-xs sm:text-sm text-slate-600 leading-relaxed">${step.message}</p>
-    <div class="mt-1 p-2.5 rounded-xl bg-white/70 border border-white/90 text-[11px] text-slate-500 font-medium">
-      ${step.hint}
-    </div>
-  `;
-
-  const btnPrev = document.getElementById('btn-dialog-prev');
-  if (currentTutorialStep === 0) {
-    btnPrev.classList.add('hidden');
-  } else {
-    btnPrev.classList.remove('hidden');
-  }
-
-  const btnText = document.getElementById('btn-next-text');
-  btnText.innerText = step.buttonText;
-
-  const btnNext = document.getElementById('btn-dialog-next');
-  if (currentTutorialStep === botDialogs.length - 1) {
-    btnNext.className = 'px-4 py-2 rounded-xl bg-gradient-to-r from-emerald-500 to-teal-600 active:scale-95 text-white font-bold text-xs shadow-md shadow-emerald-500/20 transition-all flex items-center gap-1.5';
-  } else {
-    btnNext.className = 'px-4 py-2 rounded-xl bg-gradient-to-r from-blue-500 to-indigo-600 active:scale-95 text-white font-bold text-xs shadow-md shadow-blue-500/20 transition-all flex items-center gap-1.5';
-  }
-
-  const dotsContainer = document.getElementById('tutorial-dots');
-  dotsContainer.innerHTML = '';
-  botDialogs.forEach((_, idx) => {
-    const dot = document.createElement('div');
-    dot.className = `h-2 rounded-full transition-all duration-200 ${
-      idx === currentTutorialStep ? 'w-5 bg-blue-600' : 'w-2 bg-slate-300'
-    }`;
-    dotsContainer.appendChild(dot);
-  });
-}
-
-function nextTutorialStep() {
-  if (currentTutorialStep < botDialogs.length - 1) {
-    currentTutorialStep++;
-    renderTutorialStep();
-  } else {
-    skipTutorial();
-  }
-}
-
-function prevTutorialStep() {
-  if (currentTutorialStep > 0) {
-    currentTutorialStep--;
-    renderTutorialStep();
-  }
-}
-
-function skipTutorial() {
-  closeModal('modal-tutorial');
-  localStorage.setItem('hasSeenLockerTutorial', 'true');
-}
-
 function updateAdminHeaderButtons() {
   const isAdmin = currentUser && (currentUser.role || '').toLowerCase() === 'admin';
   const adminButtons = ['btn-admin-logs', 'btn-admin-users', 'btn-admin-stats'];
@@ -672,17 +572,6 @@ function updateAdminHeaderButtons() {
       btn.classList.remove('flex');
     }
   });
-}
-
-function startTutorial(force = false) {
-  if (!force && localStorage.getItem('hasSeenLockerTutorial') === 'true') {
-    return;
-  }
-  currentTutorialStep = 0;
-  renderTutorialStep();
-  const modal = document.getElementById('modal-tutorial');
-  modal.classList.remove('hidden');
-  modal.classList.add('flex');
 }
 
 // ==========================================

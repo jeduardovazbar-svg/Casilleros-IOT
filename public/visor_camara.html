@@ -17,39 +17,60 @@
     <img id="camera-feed" src="" alt="La cámara está apagada" style="display: none;">
 
     <script>
-        // Conectar al WebSocket de tu servidor Node.js
-        const ws = new WebSocket('ws://192.168.100.142:3000');
-        const imgElement = document.getElementById('camera-feed');
-        const statusText = document.getElementById('status-text');
+  const imgElement = document.querySelector('img');
+  const statusText = document.querySelector('div, p'); // Tu contenedor con el texto de espera
 
-        ws.onopen = () => {
-            console.log("Conectado al servidor de casilleros");
-        };
+  // Conectar al servidor Node.js
+  const ws = new WebSocket(`ws://${window.location.host}`);
+  
+  // OBLIGATORIO: Asegura que los datos de la ESP32-CAM se reciban como Blob
+  ws.binaryType = 'blob';
 
-        ws.onmessage = (event) => {
-            // Si recibimos un Blob (Datos binarios), es una foto de la ESP32-CAM
-            if (event.data instanceof Blob) {
-                imgElement.style.display = 'inline-block';
-                statusText.innerText = "Transmisión en vivo: Casillero Abierto";
-                
-                const imageUrl = URL.createObjectURL(event.data);
-                imgElement.src = imageUrl;
-                
-                // Liberar memoria para no crashear el navegador
-                imgElement.onload = () => URL.revokeObjectURL(imageUrl);
-            } 
-            // Si recibimos texto, es la telemetría normal (puerta abierta/cerrada)
-            else {
-                try {
-                    const data = JSON.parse(event.data);
-                    // Ocultar cámara si reporta cerrado
-                    if (data.type === 'DOOR_STATUS_UPDATE' && data.status === 'cerrada') {
-                        imgElement.style.display = 'none';
-                        statusText.innerText = "Esperando apertura de casillero...";
-                    }
-                } catch(e) {}
+  ws.onopen = () => {
+    console.log('[WS] Conectado al visor web');
+  };
+
+  ws.onmessage = (event) => {
+    // 1. Recepción de fotograma binario JPEG
+    if (event.data instanceof Blob) {
+      const imageUrl = URL.createObjectURL(event.data);
+      imgElement.src = imageUrl;
+
+      // Hacemos visible la imagen y ocultamos el texto de espera
+      imgElement.style.display = 'block';
+      if (statusText) statusText.style.display = 'none';
+
+      // Liberar la URL de memoria una vez cargado el cuadro
+      imgElement.onload = () => URL.revokeObjectURL(imageUrl);
+    } 
+    // 2. Recepción de telemetría de texto
+    else {
+      try {
+        const data = JSON.parse(event.data);
+
+        if (data.type === 'DOOR_STATUS_UPDATE') {
+          if (data.status === 'cerrada') {
+            // Ocultar imagen y restaurar texto de espera
+            imgElement.style.display = 'none';
+            if (statusText) {
+              statusText.style.display = 'block';
+              statusText.innerText = "Esperando apertura de casillero...";
             }
-        };
-    </script>
+          } else if (data.status === 'abierta') {
+            if (statusText) {
+              statusText.innerText = "Iniciando transmisión de video...";
+            }
+          }
+        }
+      } catch (e) {
+        console.error("Error parseando telemetría:", e);
+      }
+    }
+  };
+
+  ws.onclose = () => {
+    console.warn('[WS] Conexión cerrada con el backend');
+  };
+</script>
 </body>
 </html>
