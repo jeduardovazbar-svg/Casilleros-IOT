@@ -1,32 +1,34 @@
 // src/services/esp32Bridge.js
 const WebSocket = require('ws');
 const LockerModel = require('../models/lockerModel');
+const VideoRecorder = require('./videoRecorder');
 
 let esp32Socket = null;
-let esp32CamSocket = null; // Socket para la cámara
+let esp32CamSocket = null; 
+let currentOpenBox = null;
 
 const Esp32Bridge = {
   init(server) {
-    // Servidor WS estándar sin bloqueo de subprotocolos
     const wss = new WebSocket.Server({ server });
 
     wss.on('connection', (ws, req) => {
       console.log(`[WS] Cliente conectado al puente desde ${req.socket.remoteAddress}`);
 
-      // MODIFICACIÓN CRÍTICA: Añadimos 'isBinary' para detectar las fotos de la cámara
       ws.on('message', async (message, isBinary) => {
-        
         // --- 1. RECEPTOR Y RETRANSMISOR DE VIDEO BINARIO ---
         if (isBinary) {
-          // Si es binario, es un fotograma JPEG de la ESP32-CAM.
-          // Retransmitimos a todos los clientes frontend (navegadores) conectados.
+          // Si hay una grabación activa, inyectamos el fotograma JPEG al proceso FFmpeg
+          if (currentOpenBox && VideoRecorder.isRecording(currentOpenBox)) {
+            VideoRecorder.addFrame(currentOpenBox, message);
+          }
+
+          // Retransmitir a clientes web (excluyendo a las placas ESP32)
           wss.clients.forEach(client => {
-            // Condición: Evitar enviar el video a las propias ESP32, solo enviarlo a los clientes web
             if (client !== esp32Socket && client !== esp32CamSocket && client.readyState === WebSocket.OPEN) {
               client.send(message, { binary: true });
             }
           });
-          return; // Detenemos la ejecución aquí para no intentar leer la foto como JSON
+          return;
         }
 
         // --- 2. RECEPTOR DE DATOS JSON NORMALES ---
@@ -48,29 +50,47 @@ const Esp32Bridge = {
           // B. Reporte de telemetría de sensores magnéticos y control de cámara
           if (data.type === 'DOOR_STATUS_UPDATE') {
             const { box, status } = data;
+            let videoData = null; // 👈 Declarada al inicio para evitar ReferenceError
             
-            // Actualizar base de datos
+            // Actualizar estado en la base de datos
             if (LockerModel && typeof LockerModel.updateDoorStatus === 'function') {
               await LockerModel.updateDoorStatus(box, status);
             }
             console.log(`[Telemetría] Casillero ${box}: sensor marca ${status}`);
 
-            // C. Enviar orden a la ESP32-CAM en tiempo real si está conectada
-            if (esp32CamSocket && esp32CamSocket.readyState === WebSocket.OPEN) {
-              if (status === 'abierta') {
+            // C. Control del grabador y órdenes a la ESP32-CAM
+            if (status === 'abierta') {
+              currentOpenBox = box;
+              VideoRecorder.start(box); // Inicia grabación FFmpeg
+
+              if (esp32CamSocket && esp32CamSocket.readyState === WebSocket.OPEN) {
                 console.log(`[CÁMARA] Ordenando START_CAMERA para casillero ${box}`);
                 esp32CamSocket.send(JSON.stringify({ command: 'START_CAMERA', box: box }));
-              } else if (status === 'cerrada') {
+              }
+            } 
+            else if (status === 'cerrada') {
+              videoData = VideoRecorder.stop(box); // Finaliza archivo .mp4
+              currentOpenBox = null;
+
+              if (esp32CamSocket && esp32CamSocket.readyState === WebSocket.OPEN) {
                 console.log(`[CÁMARA] Ordenando STOP_CAMERA para casillero ${box}`);
                 esp32CamSocket.send(JSON.stringify({ command: 'STOP_CAMERA', box: box }));
               }
+
+              if (videoData) {
+                console.log(`[AUDITORÍA] Video listo para vincular: ${videoData.filename}`);
+                // Si tienes modelo de movimientos para guardar la ruta del video:
+                // await MovementModel.attachVideo(box, videoData.url);
+              }
             }
-            
-            // D. Opcional: Reenviar el estado de las puertas también al Frontend web
-            // para que actualice la interfaz sin recargar la página.
+            else if (status === 'alerta_abierta') {
+              console.warn(`[ALERTA] Casillero ${box} superó el tiempo límite abierto. Cámara continúa grabando.`);
+            }
+
+            // D. Reenviar telemetría a los frontends web conectados
             wss.clients.forEach(client => {
               if (client !== esp32Socket && client !== esp32CamSocket && client.readyState === WebSocket.OPEN) {
-                client.send(message); // Reenvía el JSON original
+                client.send(message);
               }
             });
           }

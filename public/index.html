@@ -1,8 +1,8 @@
 <!DOCTYPE html>
-<html lang="es">
+<html lang="es" class="h-full">
 <head>
   <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
   <title>Smart Locker WMS - EDCAM Technologies</title>
   
   <!-- Dependencias Externas (Tailwind CSS, Chart.js, Fuentes) -->
@@ -15,123 +15,217 @@
   <!-- Estilos Locales e Icono -->
   <link rel="icon" type="image/png" href="/img/edcam-icon.png">
   <link rel="stylesheet" href="/css/style.css">
+
+  <!-- Estilos base y utilidades de Glassmorphism responsivo -->
+  <style>
+    body {
+      font-family: 'Inter', system-ui, -apple-system, sans-serif;
+      touch-action: manipulation;
+      -webkit-tap-highlight-color: transparent;
+      background: radial-gradient(circle at top right, #e0e7ff, #f8fafc 40%, #e2e8f0 100%);
+    }
+
+    /* Efecto Liquid Glass pulido */
+    .liquid-glass {
+      background: rgba(255, 255, 255, 0.72);
+      backdrop-filter: blur(20px);
+      -webkit-backdrop-filter: blur(20px);
+      border: 1px solid rgba(255, 255, 255, 0.85);
+      box-shadow: 0 20px 45px -15px rgba(15, 23, 42, 0.08), 
+                  0 0 0 1px rgba(255, 255, 255, 0.5) inset;
+    }
+
+    .glass-btn {
+      background: rgba(255, 255, 255, 0.8);
+      backdrop-filter: blur(8px);
+      border: 1px solid rgba(226, 232, 240, 0.9);
+      box-shadow: 0 2px 4px rgba(0, 0, 0, 0.02);
+      transition: all 0.15s cubic-bezier(0.4, 0, 0.2, 1);
+    }
+    .glass-btn:hover {
+      background: rgba(255, 255, 255, 0.98);
+      border-color: rgba(148, 163, 184, 0.5);
+      transform: translateY(-1px);
+    }
+    .glass-btn:active {
+      transform: scale(0.96);
+    }
+
+    .glass-input {
+      background: rgba(255, 255, 255, 0.75);
+      border: 1px solid rgba(203, 213, 225, 0.8);
+      transition: all 0.2s ease;
+    }
+    .glass-input:focus {
+      background: #ffffff;
+      border-color: #3b82f6;
+      box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.18);
+    }
+
+    /* Animación flotante para el asistente */
+    @keyframes botFloat {
+      0%, 100% { transform: translateY(0px); }
+      50% { transform: translateY(-6px); }
+    }
+    .animate-bot {
+      animation: botFloat 3.5s ease-in-out infinite;
+    }
+
+    /* Scrollbar estilizada y discreta */
+    ::-webkit-scrollbar {
+      width: 6px;
+      height: 6px;
+    }
+    ::-webkit-scrollbar-track {
+      background: rgba(241, 245, 249, 0.5);
+      border-radius: 9999px;
+    }
+    ::-webkit-scrollbar-thumb {
+      background: rgba(148, 163, 184, 0.5);
+      border-radius: 9999px;
+    }
+    ::-webkit-scrollbar-thumb:hover {
+      background: rgba(100, 116, 139, 0.8);
+    }
+  </style>
 </head>
-<body class="antialiased select-none min-h-screen relative overflow-x-hidden">
+<body class="antialiased select-none min-h-screen min-h-dvh relative overflow-x-hidden text-slate-800 flex flex-col justify-between">
 
   <!-- ================================================================= -->
   <!-- BLOQUE 1: FLUJO DE ESPERA, BIENVENIDA Y TUTORIAL                   -->
   <!-- ================================================================= -->
 
   <!-- 1.1 Protector de Pantalla / Publicidad en Video Dual -->
-  <!-- Contenedor bloqueado al tamaño exacto de pantalla -->
-  <div id="screen-screensaver" class="relative w-full h-screen h-dvh flex flex-col items-center justify-between overflow-hidden cursor-pointer bg-black select-none">
+  <div id="screen-screensaver" class="relative w-full h-screen h-dvh flex flex-col items-center justify-between overflow-hidden cursor-pointer bg-black select-none p-4 sm:p-8">
     
-    <!-- 1. Video de fondo difuminado (espacio corregido en w-full h-full) -->
+    <!-- 1. Video de fondo difuminado -->
     <video id="screensaver-video-ambient" 
-          class="absolute inset-0 w-full h-full object-cover blur-2xl opacity-40 scale-110 pointer-events-none" 
-          muted playsinline>
+          class="absolute inset-0 w-full h-full object-cover blur-3xl opacity-35 scale-110 pointer-events-none" 
+          muted playsinline loop autoplay>
       <source src="/videos/promocionalVideo1.mp4" type="video/mp4">
     </video>
 
-    <!-- 2. Video principal (absoluto para no alterar el flexbox) -->
+    <!-- 2. Video principal adaptativo -->
     <video id="screensaver-video" 
-          class="absolute inset-0 z-10 w-full h-full object-contain pointer-events-none p-4" 
+          class="absolute inset-0 z-10 w-full h-full object-contain pointer-events-none p-2 sm:p-6" 
           style="transform: translateZ(0); will-change: transform; backface-visibility: hidden;" 
-          muted playsinline>
+          muted playsinline loop autoplay>
       <source src="/videos/promocionalVideo1.mp4" type="video/mp4">
     </video>
 
     <!-- 3. Viñeta degradada -->
-    <div class="absolute inset-0 z-20 pointer-events-none bg-gradient-to-b from-black/60 via-transparent to-black/70"></div>
+    <div class="absolute inset-0 z-20 pointer-events-none bg-gradient-to-b from-black/70 via-transparent to-black/80"></div>
 
     <!-- 4. Indicador superior -->
-    <div class="relative z-30 pt-8 flex items-center gap-2 text-white/90 drop-shadow-md">
-      <span class="w-2.5 h-2.5 rounded-full bg-blue-500 animate-ping"></span>
-      <span class="text-xs uppercase tracking-widest font-bold">Estación Disponible</span>
+    <div class="relative z-30 pt-4 sm:pt-6 flex items-center gap-2.5 text-white/95 drop-shadow-md">
+      <span class="relative flex h-3 w-3">
+        <span class="animate-ping absolute inline-flex h-full w-full rounded-full bg-blue-400 opacity-75"></span>
+        <span class="relative inline-flex rounded-full h-3 w-3 bg-blue-500"></span>
+      </span>
+      <span class="text-xs sm:text-sm uppercase tracking-widest font-extrabold">Estación Disponible</span>
     </div>
 
-    <!-- 5. Llamado a la acción inferior -->
-    <div class="relative z-30 pb-12 flex flex-col items-center text-center px-4">
-      <div class="inline-flex items-center gap-2 px-5 py-2.5 rounded-full bg-white/20 backdrop-blur-md border border-white/30 text-white font-bold text-sm shadow-xl active:scale-95 transition-all">
-        <span>👆</span>
+    <!-- 5. Llamado a la acción inferior con zona segura -->
+    <div class="relative z-30 pb-6 sm:pb-10 flex flex-col items-center text-center px-4 max-w-sm">
+      <div class="inline-flex items-center gap-2.5 px-6 py-3 rounded-full bg-white/20 backdrop-blur-lg border border-white/30 text-white font-bold text-xs sm:text-sm shadow-2xl active:scale-95 transition-all">
+        <span class="text-base">👆</span>
         <span>Toca la pantalla para comenzar</span>
       </div>
-      <p class="text-[11px] text-white/60 tracking-wider uppercase font-semibold mt-3">EDCAM Technologies</p>
+      <p class="text-[10px] sm:text-[11px] text-white/70 tracking-widest uppercase font-semibold mt-3">EDCAM Technologies</p>
     </div>
   </div>
 
   <!-- 1.2 Pantalla de Bienvenida -->
-  <section id="screen-welcome" class="fixed inset-0 z-40 bg-slate-900/90 backdrop-blur-md hidden items-center justify-center p-6 text-white">
-    <div class="liquid-glass rounded-3xl p-8 max-w-lg w-full text-center shadow-2xl space-y-6">
-      <div class="size-24 p-3 bg-white/95 rounded-3xl flex items-center justify-center mx-auto shadow-xl shadow-blue-500/20 border border-white">
+  <section id="screen-welcome" class="fixed inset-0 z-40 bg-slate-950/80 backdrop-blur-md hidden items-center justify-center p-4 sm:p-6">
+    <div class="liquid-glass rounded-3xl p-6 sm:p-8 max-w-md w-full text-center shadow-2xl space-y-5 max-h-[92dvh] overflow-y-auto my-auto">
+      <div class="w-20 h-20 sm:w-24 sm:h-24 p-3 bg-white/95 rounded-2xl sm:rounded-3xl flex items-center justify-center mx-auto shadow-xl shadow-blue-500/20 border border-white/80 shrink-0">
         <img src="/img/edcam-icon.png" alt="EDCAM Technologies" class="w-full h-full object-contain">
       </div>
       <div>
-        <h2 class="text-2xl sm:text-3xl font-black text-slate-800 tracking-tight">Bienvenido a EDCAM Technologies</h2>
-        <span class="text-xs uppercase font-extrabold text-blue-600 tracking-wider block mt-1">Smart Automation Systems</span>
+        <h2 class="text-xl sm:text-2xl font-black text-slate-800 tracking-tight">Bienvenido a EDCAM</h2>
+        <span class="text-[11px] sm:text-xs uppercase font-extrabold text-blue-600 tracking-wider block mt-1">Smart Automation Systems</span>
       </div>
-      <p class="text-slate-600 text-sm leading-relaxed max-w-md mx-auto">
-        Esta máquina inteligente gestiona y entrega insumos industriales de manera autónoma y controlada mediante tecnología IoT.
+      <p class="text-slate-600 text-xs sm:text-sm leading-relaxed max-w-sm mx-auto">
+        Sistema inteligente para gestión, trazabilidad y entrega controlada de insumos industriales mediante tecnología IoT.
       </p>
-      <button onclick="FlowManager.goTo('tutorial')" class="w-full py-4 rounded-2xl bg-gradient-to-r from-blue-600 to-indigo-600 text-white font-bold text-sm uppercase tracking-wider shadow-lg shadow-blue-500/25 hover:from-blue-500 hover:to-indigo-500 active:scale-95 transition-all">
-        Ver cómo utilizar la máquina ➔
+      <button onclick="FlowManager.goTo('tutorial')" class="w-full py-3.5 sm:py-4 rounded-xl sm:rounded-2xl bg-gradient-to-r from-blue-600 to-indigo-600 text-white font-bold text-xs sm:text-sm uppercase tracking-wider shadow-lg shadow-blue-500/25 hover:from-blue-500 hover:to-indigo-500 active:scale-95 transition-all">
+        Ver instrucciones de uso ➔
       </button>
     </div>
   </section>
 
   <!-- 1.3 Pantalla de Tutorial Rápido (5 Pasos) -->
-  <section id="screen-tutorial" class="fixed inset-0 z-40 bg-slate-900/90 backdrop-blur-md hidden items-center justify-center p-6">
-    <div class="liquid-glass rounded-3xl p-8 max-w-3xl w-full shadow-2xl space-y-6">
-      <div class="text-center">
-        <span class="text-[10px] uppercase font-extrabold text-blue-600 tracking-wider">Instrucciones de Uso</span>
-        <h2 class="text-2xl font-black text-slate-800 mt-1">¿Cómo retirar tus materiales?</h2>
+  <section id="screen-tutorial" class="fixed inset-0 z-40 bg-slate-950/80 backdrop-blur-md hidden items-center justify-center p-3 sm:p-6">
+    <div class="liquid-glass rounded-3xl p-5 sm:p-8 max-w-4xl w-full shadow-2xl flex flex-col max-h-[94dvh] my-auto">
+      <div class="text-center pb-2 shrink-0">
+        <span class="text-[10px] sm:text-xs uppercase font-extrabold text-blue-600 tracking-wider">Instrucciones de Uso</span>
+        <h2 class="text-xl sm:text-2xl font-black text-slate-800 mt-0.5">¿Cómo retirar tus materiales?</h2>
       </div>
 
-      <div class="grid grid-cols-2 sm:grid-cols-5 gap-3">
-        <div class="bg-white/60 border border-white/80 p-4 rounded-2xl text-center space-y-1">
-          <div class="w-8 h-8 rounded-full bg-blue-100 text-blue-600 font-bold text-xs flex items-center justify-center mx-auto mb-1">1</div>
-          <span class="text-2xl block">
-            <img src="/img/password.svg" alt="password" class="size-10 object-contain mx-auto">
-          </span>
-          <h4 class="font-bold text-xs text-slate-800">DIGITA TU PIN</h4>
-          <p class="text-[10px] text-slate-800">Ingresa tu código de acceso.</p>
+      <div class="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-2.5 sm:gap-3 my-4 overflow-y-auto p-1">
+        <!-- Paso 1 -->
+        <div class="bg-white/70 border border-white p-3 sm:p-4 rounded-2xl text-center flex flex-col items-center justify-between shadow-sm">
+          <div class="w-7 h-7 sm:w-8 sm:h-8 rounded-full bg-blue-100 text-blue-700 font-black text-xs flex items-center justify-center mb-1">1</div>
+          <div class="h-10 sm:h-12 flex items-center justify-center my-1">
+            <img src="/img/password.svg" alt="password" class="h-8 sm:h-10 w-auto object-contain">
+          </div>
+          <div>
+            <h4 class="font-bold text-xs text-slate-800 uppercase tracking-tight">Digita tu PIN</h4>
+            <p class="text-[10px] text-slate-500 mt-0.5">Ingresa tu código de 4 dígitos.</p>
+          </div>
         </div>
-        <div class="bg-white/60 border border-white/80 p-4 rounded-2xl text-center space-y-1">
-          <div class="w-8 h-8 rounded-full bg-blue-100 text-blue-600 font-bold text-xs flex items-center justify-center mx-auto mb-1">2</div>
-          <span class="text-2xl block">
-            <img src="/img/select.svg" alt="select" class="size-10 object-contain mx-auto">
-          </span>
-          <h4 class="font-bold text-xs text-slate-800">SELECCIONA</h4>
-          <p class="text-[10px] text-slate-800">Selecciona los productos que deseas retirar.</p>
+
+        <!-- Paso 2 -->
+        <div class="bg-white/70 border border-white p-3 sm:p-4 rounded-2xl text-center flex flex-col items-center justify-between shadow-sm">
+          <div class="w-7 h-7 sm:w-8 sm:h-8 rounded-full bg-blue-100 text-blue-700 font-black text-xs flex items-center justify-center mb-1">2</div>
+          <div class="h-10 sm:h-12 flex items-center justify-center my-1">
+            <img src="/img/select.svg" alt="select" class="h-8 sm:h-10 w-auto object-contain">
+          </div>
+          <div>
+            <h4 class="font-bold text-xs text-slate-800 uppercase tracking-tight">Selecciona</h4>
+            <p class="text-[10px] text-slate-500 mt-0.5">Elige los productos a retirar.</p>
+          </div>
         </div>
-        <div class="bg-white/60 border border-white/80 p-4 rounded-2xl text-center space-y-1">
-          <div class="w-8 h-8 rounded-full bg-blue-100 text-blue-600 font-bold text-xs flex items-center justify-center mx-auto mb-1">3</div>
-          <span class="text-2xl block">
-            <img src="/img/buy.svg" alt="buy" class="size-10 object-contain mx-auto">
-          </span>
-          <h4 class="font-bold text-xs text-slate-800">CONFIRMA</h4>
-          <p class="text-[10px] text-slate-800">Da clic en comprar los productos delcarrito.</p>
+
+        <!-- Paso 3 -->
+        <div class="bg-white/70 border border-white p-3 sm:p-4 rounded-2xl text-center flex flex-col items-center justify-between shadow-sm">
+          <div class="w-7 h-7 sm:w-8 sm:h-8 rounded-full bg-blue-100 text-blue-700 font-black text-xs flex items-center justify-center mb-1">3</div>
+          <div class="h-10 sm:h-12 flex items-center justify-center my-1">
+            <img src="/img/buy.svg" alt="buy" class="h-8 sm:h-10 w-auto object-contain">
+          </div>
+          <div>
+            <h4 class="font-bold text-xs text-slate-800 uppercase tracking-tight">Confirma</h4>
+            <p class="text-[10px] text-slate-500 mt-0.5">Revisa y confirma tu pedido.</p>
+          </div>
         </div>
-        <div class="bg-white/60 border border-white/80 p-4 rounded-2xl text-center space-y-1">
-          <div class="w-8 h-8 rounded-full bg-blue-100 text-blue-600 font-bold text-xs flex items-center justify-center mx-auto mb-1">4</div>
-          <span class="text-2xl block">
-            <img src="/img/hand.svg" alt="open" class="size-10 object-contain mx-auto">
-          </span>
-          <h4 class="font-bold text-xs text-slate-800">Retira</h4>
-          <p class="text-[10px] text-slate-800">Toma tu pieza al abrirse la puerta.</p>
+
+        <!-- Paso 4 -->
+        <div class="bg-white/70 border border-white p-3 sm:p-4 rounded-2xl text-center flex flex-col items-center justify-between shadow-sm">
+          <div class="w-7 h-7 sm:w-8 sm:h-8 rounded-full bg-blue-100 text-blue-700 font-black text-xs flex items-center justify-center mb-1">4</div>
+          <div class="h-10 sm:h-12 flex items-center justify-center my-1">
+            <img src="/img/hand.svg" alt="open" class="h-8 sm:h-10 w-auto object-contain">
+          </div>
+          <div>
+            <h4 class="font-bold text-xs text-slate-800 uppercase tracking-tight">Retira</h4>
+            <p class="text-[10px] text-slate-500 mt-0.5">Toma la pieza al abrir la puerta.</p>
+          </div>
         </div>
-        <div class="bg-white/60 border border-white/80 p-4 rounded-2xl text-center space-y-1 col-span-2 sm:col-span-1">
-          <div class="w-8 h-8 rounded-full bg-blue-100 text-blue-600 font-bold text-xs flex items-center justify-center mx-auto mb-1">5</div>
-          <span class="text-2xl block">
-            <img src="/img/door.svg" alt="close" class="size-10 object-contain mx-auto">
-          </span>
-          <h4 class="font-bold text-xs text-slate-800">Cierra</h4>
-          <p class="text-[10px] text-slate-800">Empuja la compuerta firmemente.</p>
+
+        <!-- Paso 5 -->
+        <div class="bg-white/70 border border-white p-3 sm:p-4 rounded-2xl text-center flex flex-col items-center justify-between shadow-sm col-span-2 sm:col-span-1">
+          <div class="w-7 h-7 sm:w-8 sm:h-8 rounded-full bg-blue-100 text-blue-700 font-black text-xs flex items-center justify-center mb-1">5</div>
+          <div class="h-10 sm:h-12 flex items-center justify-center my-1">
+            <img src="/img/door.svg" alt="close" class="h-8 sm:h-10 w-auto object-contain">
+          </div>
+          <div>
+            <h4 class="font-bold text-xs text-slate-800 uppercase tracking-tight">Cierra</h4>
+            <p class="text-[10px] text-slate-500 mt-0.5">Empuja la compuerta firmemente.</p>
+          </div>
         </div>
       </div>
 
-      <div class="pt-2">
-        <button onclick="FlowManager.goTo('login')" class="w-full py-4 rounded-2xl bg-gradient-to-r from-blue-500 to-indigo-600 text-white font-bold text-sm uppercase tracking-wider shadow-lg shadow-blue-500/25 hover:from-blue-600 hover:to-indigo-700 active:scale-95 transition-all">
+      <div class="pt-2 shrink-0">
+        <button onclick="FlowManager.goTo('login')" class="w-full py-3.5 rounded-xl sm:rounded-2xl bg-gradient-to-r from-blue-600 to-indigo-600 text-white font-bold text-xs sm:text-sm uppercase tracking-wider shadow-lg shadow-blue-500/25 hover:from-blue-700 hover:to-indigo-700 active:scale-95 transition-all">
           Continuar al Sistema ➔
         </button>
       </div>
@@ -144,135 +238,153 @@
   <!-- ================================================================= -->
 
   <!-- 2.1 Vista: Terminal de Acceso (Teclado Numérico PIN) -->
-  <div id="view-login" class="hidden flex-col items-center justify-center min-h-screen p-4">
-    <div class="w-full max-w-sm">
+  <div id="view-login" class="hidden flex-col items-center justify-center min-h-screen min-h-dvh p-4 py-8 overflow-y-auto">
+    <div class="w-full max-w-xs sm:max-w-sm my-auto">
       
       <!-- Asistente Byte Superior -->
-      <div class="flex flex-col items-center mb-5 text-center">
-        <div class="relative w-20 h-20 animate-bot mb-2">
-          <div class="absolute inset-0 bg-cyan-400/25 rounded-full blur-lg"></div>
+      <div class="flex flex-col items-center mb-4 text-center">
+        <div class="relative w-16 h-16 sm:w-20 sm:h-20 animate-bot mb-2 shrink-0">
+          <div class="absolute inset-0 bg-blue-400/20 rounded-full blur-xl"></div>
           <img src="/img/edcam-icon.png" alt="Byte" class="relative w-full h-full object-contain drop-shadow-md"
                onerror="this.onerror=null; this.src='https://api.iconify.design/fluent-emoji-flat:robot.svg';">
         </div>
-        <div class="liquid-glass px-4 py-2 rounded-2xl border border-white/80 shadow-md mb-2 max-w-xs">
+        <div class="liquid-glass px-4 py-2 rounded-2xl border border-white/80 shadow-md max-w-xs">
           <p class="text-xs font-bold text-slate-800" id="bot-welcome-text">👋 ¡Hola! Bienvenido a EDCAM Locker.</p>
           <p class="text-[11px] text-slate-500 font-medium">Ingresa tu PIN de 4 dígitos para acceder.</p>
         </div>
       </div>
 
       <!-- Teclado Táctil -->
-      <div class="liquid-glass rounded-[2rem] p-6 shadow-2xl">
-        <div class="flex justify-center gap-4 mb-6">
-          <div id="dot-0" class="w-3.5 h-3.5 rounded-full border border-slate-300 bg-white/70 shadow-inner transition-all duration-150"></div>
-          <div id="dot-1" class="w-3.5 h-3.5 rounded-full border border-slate-300 bg-white/70 shadow-inner transition-all duration-150"></div>
-          <div id="dot-2" class="w-3.5 h-3.5 rounded-full border border-slate-300 bg-white/70 shadow-inner transition-all duration-150"></div>
-          <div id="dot-3" class="w-3.5 h-3.5 rounded-full border border-slate-300 bg-white/70 shadow-inner transition-all duration-150"></div>
+      <div class="liquid-glass rounded-3xl p-5 sm:p-6 shadow-2xl">
+        <div class="flex justify-center gap-3.5 mb-5">
+          <div id="dot-0" class="w-3.5 h-3.5 rounded-full border border-slate-300 bg-white shadow-inner transition-all duration-150"></div>
+          <div id="dot-1" class="w-3.5 h-3.5 rounded-full border border-slate-300 bg-white shadow-inner transition-all duration-150"></div>
+          <div id="dot-2" class="w-3.5 h-3.5 rounded-full border border-slate-300 bg-white shadow-inner transition-all duration-150"></div>
+          <div id="dot-3" class="w-3.5 h-3.5 rounded-full border border-slate-300 bg-white shadow-inner transition-all duration-150"></div>
         </div>
 
-        <div class="grid grid-cols-3 gap-2.5">
-          <button onclick="pressKey('1')" class="glass-btn h-14 rounded-2xl text-xl font-bold text-slate-800">1</button>
-          <button onclick="pressKey('2')" class="glass-btn h-14 rounded-2xl text-xl font-bold text-slate-800">2</button>
-          <button onclick="pressKey('3')" class="glass-btn h-14 rounded-2xl text-xl font-bold text-slate-800">3</button>
-          <button onclick="pressKey('4')" class="glass-btn h-14 rounded-2xl text-xl font-bold text-slate-800">4</button>
-          <button onclick="pressKey('5')" class="glass-btn h-14 rounded-2xl text-xl font-bold text-slate-800">5</button>
-          <button onclick="pressKey('6')" class="glass-btn h-14 rounded-2xl text-xl font-bold text-slate-800">6</button>
-          <button onclick="pressKey('7')" class="glass-btn h-14 rounded-2xl text-xl font-bold text-slate-800">7</button>
-          <button onclick="pressKey('8')" class="glass-btn h-14 rounded-2xl text-xl font-bold text-slate-800">8</button>
-          <button onclick="pressKey('9')" class="glass-btn h-14 rounded-2xl text-xl font-bold text-slate-800">9</button>
-          <button onclick="clearPin()" class="glass-btn h-14 rounded-2xl bg-rose-50/80 text-rose-600 text-xs font-bold tracking-wider uppercase border-rose-200">Borrar</button>
-          <button onclick="pressKey('0')" class="glass-btn h-14 rounded-2xl text-xl font-bold text-slate-800">0</button>
-          <button onclick="submitLogin()" class="h-14 rounded-2xl bg-gradient-to-tr from-cyan-500 to-blue-600 active:scale-95 text-white font-bold text-xs tracking-wider shadow-lg shadow-blue-500/25 transition duration-75 uppercase">Entrar</button>
+        <div class="grid grid-cols-3 gap-2 sm:gap-2.5">
+          <button onclick="pressKey('1')" class="glass-btn h-12 sm:h-14 rounded-2xl text-xl font-bold text-slate-800 flex items-center justify-center">1</button>
+          <button onclick="pressKey('2')" class="glass-btn h-12 sm:h-14 rounded-2xl text-xl font-bold text-slate-800 flex items-center justify-center">2</button>
+          <button onclick="pressKey('3')" class="glass-btn h-12 sm:h-14 rounded-2xl text-xl font-bold text-slate-800 flex items-center justify-center">3</button>
+          <button onclick="pressKey('4')" class="glass-btn h-12 sm:h-14 rounded-2xl text-xl font-bold text-slate-800 flex items-center justify-center">4</button>
+          <button onclick="pressKey('5')" class="glass-btn h-12 sm:h-14 rounded-2xl text-xl font-bold text-slate-800 flex items-center justify-center">5</button>
+          <button onclick="pressKey('6')" class="glass-btn h-12 sm:h-14 rounded-2xl text-xl font-bold text-slate-800 flex items-center justify-center">6</button>
+          <button onclick="pressKey('7')" class="glass-btn h-12 sm:h-14 rounded-2xl text-xl font-bold text-slate-800 flex items-center justify-center">7</button>
+          <button onclick="pressKey('8')" class="glass-btn h-12 sm:h-14 rounded-2xl text-xl font-bold text-slate-800 flex items-center justify-center">8</button>
+          <button onclick="pressKey('9')" class="glass-btn h-12 sm:h-14 rounded-2xl text-xl font-bold text-slate-800 flex items-center justify-center">9</button>
+          <button onclick="clearPin()" class="glass-btn h-12 sm:h-14 rounded-2xl bg-rose-50/80 text-rose-600 text-xs font-bold tracking-wider uppercase border-rose-200 flex items-center justify-center">Borrar</button>
+          <button onclick="pressKey('0')" class="glass-btn h-12 sm:h-14 rounded-2xl text-xl font-bold text-slate-800 flex items-center justify-center">0</button>
+          <button onclick="submitLogin()" class="h-12 sm:h-14 rounded-2xl bg-gradient-to-tr from-cyan-500 to-blue-600 active:scale-95 text-white font-bold text-xs tracking-wider shadow-md shadow-blue-500/25 transition duration-75 uppercase flex items-center justify-center">Entrar</button>
         </div>
 
-        <div id="login-error" class="text-xs text-rose-500 mt-4 min-h-[1.25rem] font-semibold text-center"></div>
+        <div id="login-error" class="text-xs text-rose-500 mt-3 min-h-[1.25rem] font-semibold text-center"></div>
       </div>
       
-      <p class="text-center text-[11px] text-slate-500 font-semibold mt-6 tracking-wide uppercase">EDCAM Technologies • ESP32 & Modbus RTU</p>
+      <p class="text-center text-[10px] sm:text-[11px] text-slate-500 font-semibold mt-5 tracking-wider uppercase">EDCAM Technologies • ESP32 & Modbus RTU</p>
     </div>
   </div>
 
   <!-- 2.2 Vista: Panel Principal (Dashboard) -->
-  <div id="view-dashboard" class="hidden min-h-screen flex flex-col relative">
+  <div id="view-dashboard" class="hidden min-h-screen min-h-dvh flex flex-col relative w-full">
     
-    <!-- Encabezado del Sistema -->
-    <header class="liquid-glass border-b border-white/70 px-5 py-3 sticky top-0 z-20 flex justify-between items-center">
-      <div class="flex items-center gap-3">
-        <div class="h-10 w-10 p-1 rounded-xl bg-white/80 border border-white flex items-center justify-center shadow-md shadow-blue-500/10">
+    <!-- Encabezado del Sistema Responsivo -->
+    <header class="liquid-glass border-b border-white/80 px-3 sm:px-6 py-2.5 sm:py-3 sticky top-0 z-30 flex flex-wrap gap-2 justify-between items-center shadow-sm">
+      
+      <!-- Identidad y Perfil de Usuario -->
+      <div class="flex items-center gap-2.5 sm:gap-3">
+        <div class="h-9 w-9 sm:h-10 sm:w-10 p-1.5 rounded-xl bg-white/90 border border-white flex items-center justify-center shadow-sm shrink-0">
           <img src="/img/edcam-icon.png" alt="EDCAM" class="w-full h-full object-contain">
         </div>
-        <div>
-          <div class="flex items-center gap-2">
-            <h2 class="text-sm font-bold text-slate-800 tracking-tight leading-none" id="user-display">Usuario</h2>
-            <span class="text-[10px] uppercase tracking-wider px-2 py-0.5 rounded-full font-bold" id="role-badge">Rol</span>
+        <div class="leading-tight">
+          <div class="flex items-center gap-1.5 flex-wrap">
+            <h2 class="text-xs sm:text-sm font-bold text-slate-800 tracking-tight" id="user-display">Usuario</h2>
+            <span class="text-[9px] sm:text-[10px] uppercase tracking-wider px-2 py-0.5 rounded-full font-extrabold bg-blue-100 text-blue-700 border border-blue-200" id="role-badge">Rol</span>
           </div>
-          <p class="text-[10px] text-slate-500 font-medium mt-0.5" id="header-clock">Sistema Listo</p>
+          <p class="text-[10px] text-slate-500 font-medium hidden xs:block" id="header-clock">Sistema Listo</p>
         </div>
       </div>
 
-      <div class="flex items-center gap-2">
-        <button id="btn-open-cart" onclick="toggleCartDrawer()" class="px-4 py-2 bg-gradient-to-r from-blue-500 to-indigo-600 text-white text-xs font-bold rounded-xl shadow-md shadow-blue-500/20 flex items-center gap-2 active:scale-95 transition-all">
-          <span>🛒 Carrito</span>
+      <!-- Barra de Acciones y Controles -->
+      <div class="flex items-center gap-1.5 sm:gap-2">
+        <!-- Carrito -->
+        <button id="btn-open-cart" onclick="toggleCartDrawer(true)" class="px-3 sm:px-4 py-2 bg-gradient-to-r from-blue-600 to-indigo-600 text-white text-xs font-bold rounded-xl shadow-md shadow-blue-500/20 flex items-center gap-1.5 sm:gap-2 active:scale-95 transition-all">
+          <span>🛒</span>
+          <span class="hidden sm:inline">Carrito</span>
           <span id="cart-counter" class="bg-white text-blue-600 px-1.5 py-0.2 rounded-full text-[11px] font-black">0</span>
         </button>
-        <button id="btn-admin-logs" onclick="showLogsModal()" class="hidden px-3.5 py-1.5 glass-btn text-slate-700 text-xs font-semibold rounded-xl flex items-center gap-1.5">
-          Auditoría
+
+        <!-- Botones de Administrador con íconos para móviles -->
+        <button id="btn-admin-logs" onclick="showLogsModal()" class="hidden px-2.5 sm:px-3.5 py-2 glass-btn text-slate-700 text-xs font-semibold rounded-xl items-center gap-1.5">
+          <span>📋</span>
+          <span class="hidden md:inline">Auditoría</span>
         </button>
-        <button id="btn-admin-users" onclick="openCreateUserModal()" class="hidden px-3.5 py-1.5 glass-btn text-slate-700 text-xs font-semibold rounded-xl flex items-center gap-1.5">
-          + Usuario
+        <button id="btn-admin-users" onclick="openCreateUserModal()" class="hidden px-2.5 sm:px-3.5 py-2 glass-btn text-slate-700 text-xs font-semibold rounded-xl items-center gap-1.5">
+          <span>👤</span>
+          <span class="hidden md:inline">+ Usuario</span>
         </button>
-        <button id="btn-admin-stats" onclick="openStatsModal()" class="hidden px-3.5 py-1.5 glass-btn text-slate-700 text-xs font-semibold rounded-xl flex items-center gap-1.5">
-          Métricas
+        <button id="btn-admin-stats" onclick="openStatsModal()" class="hidden px-2.5 sm:px-3.5 py-2 glass-btn text-slate-700 text-xs font-semibold rounded-xl items-center gap-1.5">
+          <span>📊</span>
+          <span class="hidden md:inline">Métricas</span>
         </button>
-        <button onclick="logout()" class="px-3.5 py-1.5 glass-btn bg-rose-50/80 text-rose-600 hover:bg-rose-100 text-xs font-semibold rounded-xl border border-rose-200 flex items-center gap-1">
-          Salir
+
+        <!-- Salir -->
+        <button onclick="logout()" class="px-2.5 sm:px-3 py-2 glass-btn bg-rose-50/90 text-rose-600 hover:bg-rose-100 text-xs font-bold rounded-xl border border-rose-200/80 flex items-center gap-1">
+          <span>🚪</span>
+          <span class="hidden sm:inline">Salir</span>
         </button>
       </div>
     </header>
 
-    <!-- Cuadrícula de Casilleros -->
-    <main class="flex-1 p-4 sm:p-6 max-w-7xl w-full mx-auto">
-      <div id="lockers-container" class="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6 gap-4 grid-dense">
+    <!-- Cuadrícula Dinámica de Casilleros -->
+    <main class="flex-1 p-3 sm:p-6 max-w-7xl w-full mx-auto">
+      <div id="lockers-container" class="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 2xl:grid-cols-8 gap-3 sm:gap-4.5 grid-dense">
         <!-- Tarjetas inyectadas dinámicamente desde app.js -->
       </div>
     </main>
 
-    <!-- Cajón Lateral del Carrito (Drawer) -->
-    <aside id="cart-drawer" class="fixed inset-y-0 right-0 w-80 sm:w-96 liquid-glass shadow-2xl z-40 border-l border-white/80 p-6 flex flex-col justify-between transform translate-x-full transition-transform duration-300 ease-in-out">
-      <div>
-        <div class="flex items-center justify-between border-b border-slate-200/80 pb-3 mb-4">
+    <!-- Cajón Lateral del Carrito (Drawer) Responsivo -->
+    <aside id="cart-drawer" class="fixed inset-y-0 right-0 w-full sm:w-96 max-w-full liquid-glass shadow-2xl z-50 border-l border-white/80 p-5 sm:p-6 flex flex-col justify-between transform translate-x-full transition-transform duration-300 ease-in-out">
+      <div class="flex flex-col h-full overflow-hidden">
+        
+        <!-- Header del Cajón -->
+        <div class="flex items-center justify-between border-b border-slate-200/80 pb-3 mb-3 shrink-0">
           <div class="flex items-center gap-2">
             <span class="text-xl">🛒</span>
             <h3 class="text-lg font-black text-slate-800">Tu Pedido</h3>
           </div>
-          <button onclick="toggleCartDrawer(false)" class="text-slate-400 hover:text-slate-700 font-bold text-lg">✕</button>
+          <button onclick="toggleCartDrawer(false)" class="w-8 h-8 rounded-full glass-btn text-slate-500 hover:text-slate-800 flex items-center justify-center font-bold text-base">✕</button>
         </div>
-        <div id="cart-items" class="space-y-2.5 max-h-[60vh] overflow-y-auto pr-1">
+        
+        <!-- Lista de Items con Scroll Interno -->
+        <div id="cart-items" class="flex-1 space-y-2.5 overflow-y-auto pr-1 my-2">
           <!-- Items inyectados dinámicamente por Cart.render() -->
         </div>
-      </div>
 
-      <div class="pt-4 border-t border-slate-200/80 space-y-2.5">
-        <button onclick="confirmOrderCheckout()" class="w-full py-3.5 bg-gradient-to-r from-emerald-500 to-teal-600 hover:from-emerald-600 hover:to-teal-700 active:scale-95 text-white font-bold text-xs uppercase tracking-wider rounded-xl shadow-lg shadow-emerald-500/25 transition">
-          Confirmar y Abrir Casilleros
-        </button>
-        <button onclick="clearCurrentCart()" class="w-full py-2.5 glass-btn text-slate-600 hover:text-rose-600 font-bold text-xs rounded-xl transition">
-          Vaciar Carrito
-        </button>
+        <!-- Acciones del Carrito -->
+        <div class="pt-3 border-t border-slate-200/80 space-y-2 shrink-0">
+          <button onclick="confirmOrderCheckout()" class="w-full py-3.5 bg-gradient-to-r from-emerald-500 to-teal-600 hover:from-emerald-600 hover:to-teal-700 active:scale-95 text-white font-bold text-xs uppercase tracking-wider rounded-xl shadow-lg shadow-emerald-500/25 transition">
+            Confirmar y Abrir Casilleros
+          </button>
+          <button onclick="clearCurrentCart()" class="w-full py-2.5 glass-btn text-slate-600 hover:text-rose-600 font-bold text-xs rounded-xl transition">
+            Vaciar Carrito
+          </button>
+        </div>
       </div>
     </aside>
   </div>
 
   <!-- 2.3 Pantalla de Éxito y Despacho -->
-  <div id="screen-success" class="fixed inset-0 bg-slate-950/85 backdrop-blur-md hidden items-center justify-center p-4 z-50">
-    <div class="liquid-glass rounded-3xl p-8 max-w-md w-full text-center shadow-2xl space-y-5">
-      <div class="w-20 h-20 bg-emerald-500/20 text-emerald-500 text-4xl rounded-2xl flex items-center justify-center mx-auto border border-emerald-500/30">
+  <div id="screen-success" class="fixed inset-0 bg-slate-950/80 backdrop-blur-md hidden items-center justify-center p-4 z-50 overflow-y-auto">
+    <div class="liquid-glass rounded-3xl p-6 sm:p-8 max-w-sm sm:max-w-md w-full text-center shadow-2xl space-y-4 max-h-[92dvh] overflow-y-auto my-auto">
+      <div class="w-16 h-16 sm:w-20 sm:h-20 bg-emerald-500/20 text-emerald-500 text-3xl sm:text-4xl rounded-2xl flex items-center justify-center mx-auto border border-emerald-500/30 shrink-0">
         ✓
       </div>
       <div>
-        <h2 class="text-2xl font-black text-slate-800">Pedido realizado, ¡gracias!</h2>
+        <h2 class="text-xl sm:text-2xl font-black text-slate-800">Pedido realizado, ¡gracias!</h2>
         <p class="text-xs text-slate-600 mt-1 font-medium">Vea la confirmación enviada por email y WhatsApp.</p>
       </div>
-      <div class="bg-white/60 p-4 rounded-2xl border border-white/80 text-xs text-slate-700 italic">
+      <div class="bg-white/60 p-3.5 sm:p-4 rounded-2xl border border-white/80 text-xs text-slate-700 italic">
         “Gracias por utilizar EDCAM Technologies. Que tenga un excelente día. Estamos a sus órdenes.”
       </div>
       <p class="text-[11px] text-slate-500 font-medium">
@@ -290,86 +402,95 @@
   <!-- ================================================================= -->
 
   <!-- 3.1 Modal: Retiro de Insumo Individual -->
-  <div id="modal-withdraw" class="fixed inset-0 bg-slate-900/30 backdrop-blur-md hidden items-center justify-center p-4 z-50">
-    <div class="liquid-glass rounded-3xl p-6 w-full max-w-sm shadow-2xl space-y-5">
-      <div class="flex items-center justify-between">
-        <span class="text-xs uppercase font-extrabold text-blue-600 tracking-wider">Retiro de Insumo</span>
-        <button onclick="closeModal('modal-withdraw')" class="text-slate-400 hover:text-slate-700 text-lg">✕</button>
+  <div id="modal-withdraw" class="fixed inset-0 bg-slate-950/70 backdrop-blur-md hidden items-center justify-center p-3 sm:p-4 z-50 overflow-y-auto">
+    <div class="liquid-glass rounded-3xl p-5 sm:p-6 w-full max-w-xs sm:max-w-sm shadow-2xl space-y-4 max-h-[92dvh] flex flex-col justify-between my-auto">
+      <div class="flex items-center justify-between border-b border-slate-200/60 pb-2">
+        <span class="text-[11px] uppercase font-extrabold text-blue-600 tracking-wider">Retiro de Insumo</span>
+        <button onclick="closeModal('modal-withdraw')" class="w-7 h-7 rounded-full glass-btn text-slate-400 hover:text-slate-700 text-sm flex items-center justify-center">✕</button>
       </div>
-      <h3 class="text-2xl font-black text-slate-800 mt-1" id="mw-locker-title">Casillero #0</h3>
-      <p class="text-xs text-slate-600 mt-0.5" id="mw-product-name">Insumo: --</p>
       
-      <div class="bg-white/60 border border-white/80 rounded-2xl p-4 flex items-center justify-between shadow-inner">
-        <button onclick="changeQty(-1)" class="w-12 h-12 rounded-xl glass-btn text-xl font-bold text-slate-800">-</button>
+      <div class="text-center">
+        <h3 class="text-xl sm:text-2xl font-black text-slate-800" id="mw-locker-title">Casillero #0</h3>
+        <p class="text-xs text-slate-600 mt-0.5 font-medium" id="mw-product-name">Insumo: --</p>
+      </div>
+      
+      <div class="bg-white/70 border border-white rounded-2xl p-3 sm:p-4 flex items-center justify-between shadow-inner">
+        <button onclick="changeQty(-1)" class="w-11 h-11 sm:w-12 sm:h-12 rounded-xl glass-btn text-xl font-black text-slate-800 flex items-center justify-center">-</button>
         <div class="text-center">
-          <span class="text-4xl font-black text-slate-800" id="mw-qty">1</span>
+          <span class="text-3xl sm:text-4xl font-black text-slate-800" id="mw-qty">1</span>
           <span class="block text-[10px] uppercase tracking-wider text-slate-500 font-semibold mt-0.5">Piezas</span>
         </div>
-        <button onclick="changeQty(1)" class="w-12 h-12 rounded-xl glass-btn text-xl font-bold text-slate-800">+</button>
+        <button onclick="changeQty(1)" class="w-11 h-11 sm:w-12 sm:h-12 rounded-xl glass-btn text-xl font-black text-slate-800 flex items-center justify-center">+</button>
       </div>
 
-      <div class="flex gap-2.5 pt-1">
+      <div class="flex gap-2 pt-2">
         <button onclick="closeModal('modal-withdraw')" class="flex-1 py-3 rounded-xl glass-btn text-slate-700 font-bold text-xs">Cancelar</button>
-        <button onclick="addToCartCurrent()" class="flex-1 py-3 rounded-xl bg-gradient-to-r from-blue-500 to-indigo-600 active:scale-95 font-bold text-xs text-white shadow-lg shadow-blue-500/25 flex items-center justify-center">
-          + Agregar al Carrito
+        <button onclick="addToCartCurrent()" class="flex-1 py-3 rounded-xl bg-gradient-to-r from-blue-600 to-indigo-600 active:scale-95 font-bold text-xs text-white shadow-md shadow-blue-500/25 flex items-center justify-center">
+          + Agregar
         </button>
       </div>
     </div>
   </div>
 
   <!-- 3.2 Modal: Panel de Configuración de Administrador por Casillero -->
-  <div id="modal-admin" class="fixed inset-0 bg-slate-900/30 backdrop-blur-md hidden items-center justify-center p-4 z-50">
-    <div class="liquid-glass rounded-3xl p-6 w-full max-w-md shadow-2xl space-y-4">
-      <div class="flex justify-between items-start border-b border-slate-200/80 pb-3">
+  <div id="modal-admin" class="fixed inset-0 bg-slate-950/70 backdrop-blur-md hidden items-center justify-center p-3 sm:p-4 z-50 overflow-y-auto">
+    <div class="liquid-glass rounded-3xl p-5 sm:p-6 w-full max-w-md shadow-2xl flex flex-col max-h-[92dvh] my-auto">
+      
+      <!-- Header -->
+      <div class="flex justify-between items-start border-b border-slate-200/80 pb-3 shrink-0">
         <div>
           <span class="text-[10px] uppercase font-bold tracking-wider px-2 py-0.5 bg-amber-100 text-amber-800 border border-amber-300 rounded-md">Panel de Control</span>
-          <h3 class="text-2xl font-black text-slate-800 mt-1" id="ma-title">Casillero #0</h3>
+          <h3 class="text-xl sm:text-2xl font-black text-slate-800 mt-1" id="ma-title">Casillero #0</h3>
         </div>
-        <button onclick="closeModal('modal-admin')" class="text-slate-400 hover:text-slate-700 text-xl font-bold p-1">✕</button>
+        <button onclick="closeModal('modal-admin')" class="w-8 h-8 rounded-full glass-btn text-slate-400 hover:text-slate-700 font-bold text-base flex items-center justify-center">✕</button>
       </div>
 
-      <!-- Configuración 1: Inventario -->
-      <div class="bg-white/50 p-4 rounded-2xl border border-white/80 space-y-3 shadow-sm">
-        <span class="text-[11px] font-bold uppercase tracking-wider text-slate-500 block">1. Asignación de Insumo</span>
-        <div>
-          <label class="text-[11px] text-slate-500 block mb-1">Nombre del Insumo / Herramienta</label>
-          <input type="text" id="ma-product" placeholder="Ej. Lentes de Seguridad" class="glass-input w-full rounded-xl px-3.5 py-2.5 text-sm outline-none transition-all">
-        </div>
-        <div class="grid grid-cols-2 gap-2.5">
+      <!-- Contenido Scrollable -->
+      <div class="overflow-y-auto flex-1 space-y-3.5 my-3 pr-1">
+        
+        <!-- Configuración 1: Inventario -->
+        <div class="bg-white/60 p-3.5 sm:p-4 rounded-2xl border border-white space-y-2.5 shadow-sm">
+          <span class="text-[11px] font-bold uppercase tracking-wider text-slate-600 block">1. Asignación de Insumo</span>
           <div>
-            <label class="text-[11px] text-slate-500 block mb-1">Stock Actual</label>
-            <input type="text" id="ma-stock-current" disabled class="w-full bg-slate-100 border border-slate-200 rounded-xl px-3 py-2 text-sm text-slate-600 font-bold">
+            <label class="text-[11px] text-slate-500 block mb-1">Nombre del Insumo / Herramienta</label>
+            <input type="text" id="ma-product" placeholder="Ej. Lentes de Seguridad" class="glass-input w-full rounded-xl px-3 py-2 text-sm outline-none">
           </div>
+          <div class="grid grid-cols-2 gap-2.5">
+            <div>
+              <label class="text-[11px] text-slate-500 block mb-1">Stock Actual</label>
+              <input type="text" id="ma-stock-current" disabled class="w-full bg-slate-100 border border-slate-200 rounded-xl px-3 py-2 text-sm text-slate-600 font-bold">
+            </div>
+            <div>
+              <label class="text-[11px] text-emerald-600 font-bold block mb-1">Surtir (+ Cantidad)</label>
+              <input type="number" id="ma-stock-add" value="0" min="0" class="glass-input w-full rounded-xl px-3 py-2 text-sm font-bold outline-none">
+            </div>
+          </div>
+          <button onclick="submitRestock()" class="w-full py-2.5 bg-gradient-to-r from-emerald-500 to-teal-600 active:scale-95 text-white font-bold rounded-xl text-xs shadow-md shadow-emerald-500/20">
+            Guardar Cambios de Inventario
+          </button>
+        </div>
+
+        <!-- Configuración 2: Test de Cerrojo Físico -->
+        <div class="bg-white/60 p-3.5 sm:p-4 rounded-2xl border border-white flex items-center justify-between gap-3 shadow-sm">
           <div>
-            <label class="text-[11px] text-emerald-600 font-semibold block mb-1">Surtir (+ Cantidad)</label>
-            <input type="number" id="ma-stock-add" value="0" min="0" class="glass-input w-full rounded-xl px-3 py-2 text-sm font-bold outline-none">
+            <span class="text-[11px] font-bold uppercase tracking-wider text-slate-600 block">2. Mecanismo Físico</span>
+            <p class="text-xs font-bold text-slate-800 mt-0.5">Destrabar Cerrojo</p>
+            <p class="text-[10px] text-slate-500">Pulso al solenoide sin alterar existencias</p>
           </div>
+          <button onclick="openLockerDirect()" class="px-3.5 py-2.5 bg-gradient-to-r from-blue-600 to-indigo-600 active:scale-95 text-white font-bold text-xs rounded-xl shadow-md shadow-blue-500/20 shrink-0">
+            Abrir Puerta
+          </button>
         </div>
-        <button onclick="submitRestock()" class="w-full py-2.5 bg-gradient-to-r from-emerald-500 to-teal-600 active:scale-95 text-white font-bold rounded-xl text-xs shadow-md shadow-emerald-500/20">
-          Guardar Cambios de Inventario
-        </button>
-      </div>
 
-      <!-- Configuración 2: Test de Cerrojo Físico -->
-      <div class="bg-white/50 p-4 rounded-2xl border border-white/80 flex items-center justify-between gap-3 shadow-sm">
-        <div>
-          <span class="text-[11px] font-bold uppercase tracking-wider text-slate-500 block">2. Mecanismo Físico</span>
-          <p class="text-xs font-bold text-slate-800 mt-0.5">Destrabar Cerrojo</p>
-          <p class="text-[10px] text-slate-500">Pulso al solenoide sin alterar existencias</p>
-        </div>
-        <button onclick="openLockerDirect()" class="px-4 py-2.5 bg-gradient-to-r from-blue-500 to-indigo-600 active:scale-95 text-white font-bold text-xs rounded-xl shadow-md shadow-blue-500/20 shrink-0">
-          Abrir Puerta
-        </button>
-      </div>
-
-      <!-- Configuración 3: Dimensiones Físicas -->
-      <div class="bg-white/50 p-4 rounded-2xl border border-white/80 space-y-2 shadow-sm">
-        <span class="text-[11px] font-bold uppercase tracking-wider text-slate-500 block">3. Tamaño Físico (Cuadrícula)</span>
-        <div class="grid grid-cols-4 gap-2">
-          <button onclick="submitResize('S')" class="py-2 rounded-xl glass-btn text-xs font-bold text-slate-700">S <span class="text-[10px] font-normal block opacity-60">1x1</span></button>
-          <button onclick="submitResize('M')" class="py-2 rounded-xl glass-btn text-xs font-bold text-slate-700">M <span class="text-[10px] font-normal block opacity-60">2x1</span></button>
-          <button onclick="submitResize('L')" class="py-2 rounded-xl glass-btn text-xs font-bold text-slate-700">L <span class="text-[10px] font-normal block opacity-60">1x2</span></button>
-          <button onclick="submitResize('XL')" class="py-2 rounded-xl glass-btn text-xs font-bold text-slate-700">XL <span class="text-[10px] font-normal block opacity-60">2x2</span></button>
+        <!-- Configuración 3: Dimensiones Físicas -->
+        <div class="bg-white/60 p-3.5 sm:p-4 rounded-2xl border border-white space-y-2 shadow-sm">
+          <span class="text-[11px] font-bold uppercase tracking-wider text-slate-600 block">3. Tamaño Físico (Cuadrícula)</span>
+          <div class="grid grid-cols-4 gap-2">
+            <button onclick="submitResize('S')" class="py-2 rounded-xl glass-btn text-xs font-bold text-slate-700">S <span class="text-[10px] font-normal block opacity-60">1x1</span></button>
+            <button onclick="submitResize('M')" class="py-2 rounded-xl glass-btn text-xs font-bold text-slate-700">M <span class="text-[10px] font-normal block opacity-60">2x1</span></button>
+            <button onclick="submitResize('L')" class="py-2 rounded-xl glass-btn text-xs font-bold text-slate-700">L <span class="text-[10px] font-normal block opacity-60">1x2</span></button>
+            <button onclick="submitResize('XL')" class="py-2 rounded-xl glass-btn text-xs font-bold text-slate-700">XL <span class="text-[10px] font-normal block opacity-60">2x2</span></button>
+          </div>
         </div>
       </div>
     </div>
@@ -381,37 +502,40 @@
   <!-- ================================================================= -->
 
   <!-- 4.1 Modal: Alta de Nuevo Usuario -->
-  <div id="modal-create-user" class="fixed inset-0 bg-slate-900/30 backdrop-blur-md hidden items-center justify-center p-4 z-50">
-    <div class="liquid-glass rounded-3xl p-6 w-full max-w-md shadow-2xl space-y-4">
-      <div class="flex justify-between items-center pb-3 border-b border-slate-200/80">
+  <div id="modal-create-user" class="fixed inset-0 bg-slate-950/70 backdrop-blur-md hidden items-center justify-center p-3 sm:p-4 z-50 overflow-y-auto">
+    <div class="liquid-glass rounded-3xl p-5 sm:p-6 w-full max-w-md shadow-2xl flex flex-col max-h-[92dvh] my-auto">
+      
+      <div class="flex justify-between items-center pb-3 border-b border-slate-200/80 shrink-0">
         <div>
           <span class="text-[10px] uppercase font-bold tracking-wider px-2 py-0.5 bg-blue-100 text-blue-700 border border-blue-200 rounded-md">Control de Acceso</span>
-          <h3 class="text-xl font-black text-slate-800 mt-1">Nuevo Usuario</h3>
+          <h3 class="text-xl font-black text-slate-800 mt-0.5">Nuevo Usuario</h3>
         </div>
-        <button onclick="closeModal('modal-create-user')" class="text-slate-400 hover:text-slate-700 font-bold text-lg p-1">✕</button>
+        <button onclick="closeModal('modal-create-user')" class="w-8 h-8 rounded-full glass-btn text-slate-400 hover:text-slate-700 font-bold text-base flex items-center justify-center">✕</button>
       </div>
 
-      <form id="form-create-user" onsubmit="submitCreateUser(event)" class="space-y-3.5">
+      <form id="form-create-user" onsubmit="submitCreateUser(event)" class="overflow-y-auto flex-1 space-y-3 my-3 pr-1">
         <div>
           <label class="text-[11px] font-bold text-slate-600 block mb-1">Nombre / Identificador</label>
-          <input type="text" id="cu-username" required placeholder="Ej. Operador Turno Matutino" class="glass-input w-full rounded-xl px-3.5 py-2.5 text-sm outline-none">
+          <input type="text" id="cu-username" required placeholder="Ej. Operador Turno Matutino" class="glass-input w-full rounded-xl px-3 py-2 text-sm outline-none">
         </div>
-        <div>
-          <label class="text-[11px] font-bold text-slate-600 block mb-1">Telefono</label>
-          <input type="text" id="cu-phone" required placeholder="Ej. 449-555-1234" class="glass-input w-full rounded-xl px-3.5 py-2.5 text-sm outline-none">
+        <div class="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
+          <div>
+            <label class="text-[11px] font-bold text-slate-600 block mb-1">Teléfono</label>
+            <input type="tel" id="cu-phone" required placeholder="Ej. 449-555-1234" class="glass-input w-full rounded-xl px-3 py-2 text-sm outline-none">
+          </div>
+          <div>
+            <label class="text-[11px] font-bold text-slate-600 block mb-1">Email</label>
+            <input type="email" id="cu-mail" required placeholder="ejemplo@dominio.com" class="glass-input w-full rounded-xl px-3 py-2 text-sm outline-none">
+          </div>
         </div>
-        <div>
-          <label class="text-[11px] font-bold text-slate-600 block mb-1">Email</label>
-          <input type="text" id="cu-mail" required placeholder="Ej. ejemplo@dominio.com" class="glass-input w-full rounded-xl px-3.5 py-2.5 text-sm outline-none">
-        </div>
-        <div class="grid grid-cols-2 gap-3">
+        <div class="grid grid-cols-2 gap-2.5">
           <div>
             <label class="text-[11px] font-bold text-slate-600 block mb-1">PIN (4 Dígitos)</label>
-            <input type="text" id="cu-pin" maxlength="4" pattern="[0-9]{4}" inputmode="numeric" required placeholder="1234" class="glass-input w-full rounded-xl px-3.5 py-2.5 text-sm outline-none text-center font-mono font-bold tracking-widest">
+            <input type="password" id="cu-pin" maxlength="4" pattern="[0-9]{4}" inputmode="numeric" required placeholder="••••" class="glass-input w-full rounded-xl px-3 py-2 text-sm outline-none text-center font-mono font-bold tracking-widest">
           </div>
           <div>
             <label class="text-[11px] font-bold text-slate-600 block mb-1">Rol de Acceso</label>
-            <select id="cu-role" onchange="toggleRoleFields()" class="glass-input w-full rounded-xl px-3 py-2.5 text-sm outline-none">
+            <select id="cu-role" onchange="toggleRoleFields()" class="glass-input w-full rounded-xl px-3 py-2 text-sm outline-none bg-white">
               <option value="empleado">Empleado</option>
               <option value="operador">Operador</option>
               <option value="admin">Administrador</option>
@@ -420,12 +544,12 @@
         </div>
 
         <!-- Sección de Restricción para Rol Empleado -->
-        <div id="cu-employee-section" class="bg-white/50 p-3.5 rounded-2xl border border-white/80 space-y-3 shadow-sm">
+        <div id="cu-employee-section" class="bg-white/60 p-3 rounded-2xl border border-white space-y-2.5 shadow-sm">
           <span class="text-[10px] font-bold uppercase tracking-wider text-slate-500 block">Restricciones de Empleado</span>
-          <div class="grid grid-cols-2 gap-3">
+          <div class="grid grid-cols-2 gap-2.5">
             <div>
               <label class="text-[11px] text-slate-500 block mb-1">Casillero Asignado</label>
-              <select id="cu-locker" class="glass-input w-full rounded-xl px-3 py-2 text-sm outline-none"></select>
+              <select id="cu-locker" class="glass-input w-full rounded-xl px-3 py-2 text-sm outline-none bg-white"></select>
             </div>
             <div>
               <label class="text-[11px] text-slate-500 block mb-1">Cuota Máxima</label>
@@ -434,26 +558,26 @@
           </div>
         </div>
 
-        <div class="flex gap-2.5 pt-2">
+        <div class="flex gap-2 pt-2 shrink-0">
           <button type="button" onclick="closeModal('modal-create-user')" class="flex-1 py-2.5 rounded-xl glass-btn text-slate-700 font-bold text-xs">Cancelar</button>
-          <button type="submit" class="flex-1 py-2.5 rounded-xl bg-gradient-to-r from-blue-500 to-indigo-600 active:scale-95 text-white font-bold text-xs shadow-md shadow-blue-500/20">Crear Cuenta</button>
+          <button type="submit" class="flex-1 py-2.5 rounded-xl bg-gradient-to-r from-blue-600 to-indigo-600 active:scale-95 text-white font-bold text-xs shadow-md shadow-blue-500/20">Crear Cuenta</button>
         </div>
       </form>
     </div>
   </div>
 
   <!-- 4.2 Modal: Bitácora de Auditoría y Trazabilidad -->
-  <div id="modal-logs" class="fixed inset-0 bg-slate-900/30 backdrop-blur-md hidden items-center justify-center p-4 z-50">
-    <div class="liquid-glass rounded-3xl p-6 w-full max-w-2xl max-h-[85vh] flex flex-col shadow-2xl">
-      <div class="flex justify-between items-center pb-3 border-b border-slate-200/80 mb-3">
-        <div class="flex items-center gap-2">
-          <div class="w-8 h-8 rounded-lg bg-blue-100 text-blue-600 flex items-center justify-center font-bold text-sm">📋</div>
+  <div id="modal-logs" class="fixed inset-0 bg-slate-950/70 backdrop-blur-md hidden items-center justify-center p-3 sm:p-6 z-50 overflow-y-auto">
+    <div class="liquid-glass rounded-3xl p-5 sm:p-6 w-full max-w-3xl max-h-[90dvh] flex flex-col shadow-2xl my-auto">
+      <div class="flex justify-between items-center pb-3 border-b border-slate-200/80 mb-3 shrink-0">
+        <div class="flex items-center gap-2.5">
+          <div class="w-8 h-8 rounded-xl bg-blue-100 text-blue-700 flex items-center justify-center font-bold text-sm shrink-0">📋</div>
           <div>
-            <h3 class="text-base font-black text-slate-800">Bitácora de Trazabilidad</h3>
-            <p class="text-[11px] text-slate-500">Registros de retiros, surtidos y aperturas directas</p>
+            <h3 class="text-base sm:text-lg font-black text-slate-800">Bitácora de Trazabilidad</h3>
+            <p class="text-[10px] sm:text-[11px] text-slate-500">Registros en tiempo real de retiros, surtidos y aperturas</p>
           </div>
         </div>
-        <button onclick="closeModal('modal-logs')" class="text-slate-400 hover:text-slate-700 font-bold text-lg p-1">✕</button>
+        <button onclick="closeModal('modal-logs')" class="w-8 h-8 rounded-full glass-btn text-slate-400 hover:text-slate-700 font-bold text-base flex items-center justify-center">✕</button>
       </div>
       <div class="overflow-y-auto flex-1 pr-1 space-y-2" id="logs-list">
         <!-- Renglones de auditoría inyectados por JS -->
@@ -462,25 +586,26 @@
   </div>
 
   <!-- 4.3 Modal: Analítica WMS (Chart.js) -->
-  <div id="modal-stats" class="fixed inset-0 bg-slate-900/30 backdrop-blur-md hidden items-center justify-center p-4 z-50">
-    <div class="liquid-glass rounded-3xl p-6 w-full max-w-4xl max-h-[90vh] flex flex-col shadow-2xl">
-      <div class="flex justify-between items-center pb-3 border-b border-slate-200/80 mb-4">
+  <div id="modal-stats" class="fixed inset-0 bg-slate-950/70 backdrop-blur-md hidden items-center justify-center p-3 sm:p-6 z-50 overflow-y-auto">
+    <div class="liquid-glass rounded-3xl p-5 sm:p-6 w-full max-w-4xl max-h-[92dvh] flex flex-col shadow-2xl my-auto">
+      <div class="flex justify-between items-center pb-3 border-b border-slate-200/80 mb-3 shrink-0">
         <div>
           <span class="text-[10px] uppercase font-bold tracking-wider px-2 py-0.5 bg-indigo-100 text-indigo-700 border border-indigo-200 rounded-md">Analítica WMS</span>
-          <h3 class="text-xl font-black text-slate-800 mt-1">Métricas de Consumo y Personal</h3>
+          <h3 class="text-lg sm:text-xl font-black text-slate-800 mt-0.5">Métricas de Consumo y Personal</h3>
         </div>
-        <button onclick="closeModal('modal-stats')" class="text-slate-400 hover:text-slate-700 font-bold text-lg p-1">✕</button>
+        <button onclick="closeModal('modal-stats')" class="w-8 h-8 rounded-full glass-btn text-slate-400 hover:text-slate-700 font-bold text-base flex items-center justify-center">✕</button>
       </div>
-      <div class="overflow-y-auto flex-1 grid grid-cols-1 md:grid-cols-2 gap-4 pr-1">
-        <div class="bg-white/60 border border-white/80 p-4 rounded-2xl flex flex-col justify-between shadow-sm">
+      
+      <div class="overflow-y-auto flex-1 grid grid-cols-1 md:grid-cols-2 gap-4 pr-1 py-1">
+        <div class="bg-white/70 border border-white p-4 rounded-2xl flex flex-col justify-between shadow-sm">
           <h4 class="text-xs font-bold uppercase tracking-wider text-slate-700 mb-2">Consumo por Insumo (Piezas)</h4>
-          <div class="relative h-64 w-full">
+          <div class="relative h-60 sm:h-72 w-full">
             <canvas id="chart-products"></canvas>
           </div>
         </div>
-        <div class="bg-white/60 border border-white/80 p-4 rounded-2xl flex flex-col justify-between shadow-sm">
+        <div class="bg-white/70 border border-white p-4 rounded-2xl flex flex-col justify-between shadow-sm">
           <h4 class="text-xs font-bold uppercase tracking-wider text-slate-700 mb-2">Piezas Retiradas por Operador</h4>
-          <div class="relative h-64 w-full">
+          <div class="relative h-60 sm:h-72 w-full">
             <canvas id="chart-users"></canvas>
           </div>
         </div>
