@@ -79,12 +79,12 @@ const LockerController = {
         return error(res, 'El ESP32 no está conectado vía WebSocket', 503);
       }
 
-      // 2. REGISTRO EN BITÁCORA (dentro de try/catch para evitar que bloquee la apertura)
+      // 2. REGISTRO EN BITÁCORA
       try {
         await MovementModel.log({
           lockerId: locker.id,
           userId: user.id,
-          actionType: 'RETIRO', // Usa RETIRO para ser 100% compatible con ENUMs existentes
+          actionType: 'RETIRO',
           quantityChanged: 0,
           stockBefore: locker.current_stock,
           stockAfter: locker.current_stock,

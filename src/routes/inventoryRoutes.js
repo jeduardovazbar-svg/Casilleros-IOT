@@ -6,8 +6,10 @@ const InventoryController = require('../controllers/inventoryController');
 // POST /api/inventory/withdraw (Retiro con descuento de stock y disparo Modbus)
 router.post('/withdraw', InventoryController.withdraw);
 
+// POST /api/inventory/checkout (Retiro consolidado de carrito)
+router.post('/checkout', InventoryController.checkout);
+
 // POST /api/inventory/restock (Reabastecimiento exclusivo para Admin)
 router.post('/restock', InventoryController.restock);
-router.post('/checkout', InventoryController.checkout);
 
 module.exports = router;

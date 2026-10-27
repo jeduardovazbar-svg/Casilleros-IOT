@@ -8,6 +8,7 @@ let currentWithdrawQty = 1;
 let availableLockers = [];
 let chartProductsInstance = null;
 let chartUsersInstance = null;
+let isShowingRecordings = false;
 
 // Lista de reproducción de videos promocionales
 const promoPlaylist = [
@@ -176,6 +177,7 @@ async function loadLockers() {
       const sizeClass = `size-${l.size_type || 'S'}`;
       const isWarning = l.status === 'maintenance';
       const hasStock = l.current_stock > 0;
+      const price = parseFloat(l.price) || 0;
 
       card.className = `${sizeClass} group relative liquid-glass rounded-2xl p-4 flex flex-col justify-between cursor-pointer active:scale-[0.98] transition-all overflow-hidden ${
         isWarning ? 'border-amber-400/80 bg-amber-50/60' : 'hover:border-blue-400 hover:shadow-lg'
@@ -195,11 +197,22 @@ async function loadLockers() {
           <h4 class="font-bold text-xs sm:text-sm text-slate-800 leading-tight line-clamp-2">
             ${l.product_name || '<span class="text-slate-400 italic font-normal">Sin Asignar</span>'}
           </h4>
-          <div class="flex items-center gap-1.5 mt-1.5">
-            <span class="w-2 h-2 rounded-full ${hasStock ? 'bg-blue-500' : 'bg-rose-500'}"></span>
-            <span class="text-[11px] font-medium text-slate-600">
-              Stock: <strong class="${hasStock ? 'text-slate-800' : 'text-rose-500'}">${l.current_stock}</strong>
-            </span>
+          <div class="space-y-1.5 mt-2">
+            <div class="flex items-center justify-between text-xs">
+              <span class="text-[11px] font-medium text-slate-500 flex items-center gap-1.5">
+                <span class="w-2 h-2 rounded-full ${hasStock ? 'bg-blue-500' : 'bg-rose-500'}"></span>
+                Stock:
+              </span>
+              <span class="text-xs font-bold ${hasStock ? 'text-slate-800' : 'text-rose-500'}">
+                ${l.current_stock} pzas
+              </span>
+            </div>
+            <div class="flex items-center justify-between text-xs">
+              <span class="text-[11px] font-medium text-slate-500">Precio:</span>
+              <span class="text-xs font-black text-blue-700 bg-blue-50/90 px-2 py-0.5 rounded-md border border-blue-200/60 shadow-sm">
+                $${price.toFixed(2)}
+              </span>
+            </div>
           </div>
         </div>
 
@@ -234,6 +247,7 @@ function openAdminModal(locker) {
   selectedLocker = locker;
   document.getElementById('ma-title').innerText = `Casillero #${locker.locker_number.toString().padStart(2, '0')}`;
   document.getElementById('ma-product').value = locker.product_name || '';
+  document.getElementById('ma-price').value = parseFloat(locker.price || 0).toFixed(2);
   document.getElementById('ma-stock-current').value = `${locker.current_stock} piezas`;
   document.getElementById('ma-stock-add').value = 0;
   document.getElementById('modal-admin').classList.remove('hidden');
@@ -242,6 +256,7 @@ function openAdminModal(locker) {
 
 async function submitRestock() {
   const pName = document.getElementById('ma-product').value.trim();
+  const priceVal = parseFloat(document.getElementById('ma-price').value);
   const addQty = parseInt(document.getElementById('ma-stock-add').value, 10) || 0;
 
   try {
@@ -252,7 +267,8 @@ async function submitRestock() {
         user_id: currentUser.id,
         locker_id: selectedLocker.id,
         quantity: addQty,
-        product_name: pName
+        product_name: pName,
+        price: isNaN(priceVal) ? 0 : priceVal
       })
     });
     const json = await res.json();
@@ -312,9 +328,19 @@ async function submitResize(size) {
 function openWithdrawModal(locker) {
   selectedLocker = locker;
   currentWithdrawQty = 1;
+  const price = parseFloat(locker.price) || 0;
+
   document.getElementById('mw-locker-title').innerText = `Casillero #${locker.locker_number.toString().padStart(2, '0')}`;
   document.getElementById('mw-product-name').innerText = `Insumo: ${locker.product_name || 'Sin Asignar'} (Disponibles: ${locker.current_stock})`;
+  
+  const priceEl = document.getElementById('mw-product-price');
+  if (priceEl) priceEl.innerText = `Precio Unitario: $${price.toFixed(2)}`;
+
   document.getElementById('mw-qty').innerText = currentWithdrawQty;
+
+  const subtotalEl = document.getElementById('mw-subtotal');
+  if (subtotalEl) subtotalEl.innerText = `$${(price * currentWithdrawQty).toFixed(2)}`;
+
   document.getElementById('modal-withdraw').classList.remove('hidden');
   document.getElementById('modal-withdraw').classList.add('flex');
 }
@@ -328,6 +354,10 @@ function changeQty(delta) {
   if (next >= 1 && next <= max) {
     currentWithdrawQty = next;
     document.getElementById('mw-qty').innerText = currentWithdrawQty;
+
+    const price = parseFloat(selectedLocker.price) || 0;
+    const subtotalEl = document.getElementById('mw-subtotal');
+    if (subtotalEl) subtotalEl.innerText = `$${(price * currentWithdrawQty).toFixed(2)}`;
   }
 }
 
@@ -361,35 +391,57 @@ async function confirmWithdraw() {
 }
 
 // ==========================================
-// BITÁCORA Y REGISTRO DE AUDITORÍA
+// BITÁCORA Y REGISTRO DE AUDITORÍA CON VIDEO
 // ==========================================
 async function showLogsModal() {
+  isShowingRecordings = false;
+  const toggleBtn = document.getElementById('toggle-recordings-label');
+  if (toggleBtn) toggleBtn.innerText = 'Ver Grabaciones';
+
+  const logsList = document.getElementById('logs-list');
+  const recList = document.getElementById('recordings-list');
+  if (logsList) logsList.classList.remove('hidden');
+  if (recList) recList.classList.add('hidden');
+
   try {
     const res = await fetch(`/api/reports/daily?user_id=${currentUser.id}`);
     const json = await res.json();
-    const list = document.getElementById('logs-list');
-    list.innerHTML = '';
+    logsList.innerHTML = '';
 
     if (!json.data || json.data.length === 0) {
-      list.innerHTML = '<div class="text-center py-8 text-xs text-slate-500">No hay movimientos registrados hoy.</div>';
+      logsList.innerHTML = '<div class="text-center py-8 text-xs text-slate-500">No hay movimientos registrados hoy.</div>';
     } else {
       json.data.forEach(log => {
         const isOut = log.quantity_changed <= 0;
         const item = document.createElement('div');
-        item.className = 'p-3 rounded-2xl bg-white/70 border border-white/90 text-xs flex justify-between items-center shadow-sm';
+        item.className = 'p-3.5 rounded-2xl bg-white/70 border border-white/90 text-xs flex flex-col sm:flex-row justify-between sm:items-center gap-2 shadow-sm';
+        
+        let videoBtnHtml = '';
+        if (log.video_url) {
+          videoBtnHtml = `
+            <button onclick="playVideo('${log.video_url}', 'Casillero #${log.locker_number} - ${log.username}')" 
+                    class="mt-1 sm:mt-0 px-2.5 py-1 rounded-xl bg-blue-50 hover:bg-blue-100 text-blue-700 font-bold text-[10px] inline-flex items-center gap-1 border border-blue-200 transition active:scale-95">
+              <span>📹</span> <span>Ver Video</span>
+            </button>
+          `;
+        }
+
         item.innerHTML = `
           <div>
-            <div class="flex items-center gap-1.5">
+            <div class="flex items-center gap-1.5 flex-wrap">
               <span class="font-bold text-slate-800">${log.username}</span> 
               <span class="text-[10px] px-1.5 py-0.2 rounded bg-slate-200 text-slate-700 uppercase font-semibold">${log.role}</span>
+              ${videoBtnHtml}
             </div>
-            <div class="text-[11px] text-slate-500 mt-0.5">
+            <div class="text-[11px] text-slate-500 mt-1">
               Casillero <strong class="text-slate-700">#${log.locker_number}</strong> 
               <span class="text-slate-400 mx-1">•</span> 
-              ${new Date(log.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+              ${log.product_name || 'Insumo'}
+              <span class="text-slate-400 mx-1">•</span>
+              ${new Date(log.created_at).toLocaleString([], { dateStyle: 'short', timeStyle: 'short' })}
             </div>
           </div>
-          <div class="text-right">
+          <div class="text-left sm:text-right">
             <div class="${isOut ? 'text-rose-500' : 'text-emerald-600'} font-black text-sm">
               ${log.quantity_changed > 0 ? '+' : ''}${log.quantity_changed} pzas
             </div>
@@ -398,14 +450,110 @@ async function showLogsModal() {
             </div>
           </div>
         `;
-        list.appendChild(item);
+        logsList.appendChild(item);
       });
     }
 
     document.getElementById('modal-logs').classList.remove('hidden');
     document.getElementById('modal-logs').classList.add('flex');
   } catch (err) {
-    alert('Error al consultar registros');
+    alert('Error al consultar registros de auditoría');
+  }
+}
+
+// Alternar entre bitácora de base de datos y lista de archivos MP4
+async function toggleRecordingsView() {
+  isShowingRecordings = !isShowingRecordings;
+  const toggleBtn = document.getElementById('toggle-recordings-label');
+  const logsList = document.getElementById('logs-list');
+  const recList = document.getElementById('recordings-list');
+
+  if (isShowingRecordings) {
+    if (toggleBtn) toggleBtn.innerText = 'Ver Bitácora';
+    if (logsList) logsList.classList.add('hidden');
+    if (recList) recList.classList.remove('hidden');
+    await loadRecordingsList();
+  } else {
+    if (toggleBtn) toggleBtn.innerText = 'Ver Grabaciones';
+    if (logsList) logsList.classList.remove('hidden');
+    if (recList) recList.classList.add('hidden');
+  }
+}
+
+// Carga las grabaciones físicas en almacenamiento
+async function loadRecordingsList() {
+  const recList = document.getElementById('recordings-list');
+  if (!recList) return;
+  recList.innerHTML = '<div class="text-center py-6 text-xs text-slate-500">Cargando grabaciones de seguridad...</div>';
+
+  try {
+    const res = await fetch(`/api/reports/recordings?user_id=${currentUser.id}`);
+    const json = await res.json();
+    recList.innerHTML = '';
+
+    if (!json.data || json.data.length === 0) {
+      recList.innerHTML = '<div class="text-center py-8 text-xs text-slate-500">No se encontraron grabaciones en el disco del servidor.</div>';
+      return;
+    }
+
+    json.data.forEach(rec => {
+      const item = document.createElement('div');
+      item.className = 'p-3.5 rounded-2xl bg-white/70 border border-white/90 text-xs flex justify-between items-center shadow-sm';
+      item.innerHTML = `
+        <div class="flex-1 mr-2">
+          <div class="flex items-center gap-2">
+            <span class="text-base">📹</span>
+            <span class="font-bold text-slate-800 truncate max-w-[220px] sm:max-w-xs font-mono text-[11px]">${rec.filename}</span>
+          </div>
+          <div class="text-[11px] text-slate-500 mt-1">
+            Tamaño: <strong class="text-slate-700">${rec.sizeMB} MB</strong> 
+            <span class="text-slate-400 mx-1">•</span> 
+            ${new Date(rec.createdAt).toLocaleString([], { dateStyle: 'short', timeStyle: 'short' })}
+          </div>
+        </div>
+        <button onclick="playVideo('${rec.url}', '${rec.filename}')" 
+                class="px-3 py-1.5 bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 text-white font-bold rounded-xl text-xs active:scale-95 shadow-sm transition shrink-0 flex items-center gap-1">
+          <span>▶</span> <span>Reproducir</span>
+        </button>
+      `;
+      recList.appendChild(item);
+    });
+  } catch (err) {
+    recList.innerHTML = '<div class="text-center py-6 text-xs text-rose-500">Error al cargar grabaciones de video</div>';
+  }
+}
+
+// Reproductor de video integrado
+function playVideo(url, title = 'Grabación de Seguridad') {
+  const modal = document.getElementById('modal-video-player');
+  const video = document.getElementById('audit-video-element');
+  const titleEl = document.getElementById('video-player-title');
+  const filenameEl = document.getElementById('video-player-filename');
+  const downloadEl = document.getElementById('video-player-download');
+
+  if (!modal || !video) return;
+
+  const filename = url.split('/').pop();
+  video.src = url;
+  if (titleEl) titleEl.innerText = title;
+  if (filenameEl) filenameEl.innerText = filename;
+  if (downloadEl) downloadEl.href = url;
+
+  modal.classList.remove('hidden');
+  modal.classList.add('flex');
+  video.play().catch(() => {});
+}
+
+function closeVideoPlayer() {
+  const modal = document.getElementById('modal-video-player');
+  const video = document.getElementById('audit-video-element');
+  if (video) {
+    video.pause();
+    video.src = '';
+  }
+  if (modal) {
+    modal.classList.add('hidden');
+    modal.classList.remove('flex');
   }
 }
 
@@ -601,7 +749,7 @@ const FlowManager = {
 
   goTo(target) {
     // 1. Cerrar cualquier modal abierto para evitar superposiciones
-    ['modal-withdraw', 'modal-admin', 'modal-logs', 'modal-create-user', 'modal-stats', 'modal-tutorial'].forEach(id => {
+    ['modal-withdraw', 'modal-admin', 'modal-logs', 'modal-create-user', 'modal-stats', 'modal-video-player'].forEach(id => {
       closeModal(id);
     });
 
@@ -748,10 +896,20 @@ const Cart = {
   render() {
     const counter = document.getElementById('cart-counter');
     const container = document.getElementById('cart-items');
+    const totalPriceEl = document.getElementById('cart-total-price');
 
     if (counter) {
       const totalUnits = this.items.reduce((acc, curr) => acc + curr.quantity, 0);
       counter.innerText = totalUnits;
+    }
+
+    const orderTotal = this.items.reduce((acc, curr) => {
+      const unitP = parseFloat(curr.price) || 0;
+      return acc + (unitP * curr.quantity);
+    }, 0);
+
+    if (totalPriceEl) {
+      totalPriceEl.innerText = `$${orderTotal.toFixed(2)}`;
     }
 
     if (!container) return;
@@ -766,22 +924,30 @@ const Cart = {
       return;
     }
 
-    container.innerHTML = this.items.map(item => `
-      <div class="p-3 rounded-2xl bg-white/70 border border-white/90 text-xs flex justify-between items-center shadow-sm">
-        <div class="flex-1 mr-2">
-          <div class="flex items-center gap-1.5">
-            <span class="font-black text-slate-800 text-xs">#${item.locker_number.toString().padStart(2, '0')}</span>
-            <span class="font-bold text-slate-700 text-xs truncate max-w-[130px]">${item.product_name || 'Insumo'}</span>
+    container.innerHTML = this.items.map(item => {
+      const unitP = parseFloat(item.price) || 0;
+      const subtotal = unitP * item.quantity;
+      return `
+        <div class="p-3 rounded-2xl bg-white/70 border border-white/90 text-xs flex justify-between items-center shadow-sm">
+          <div class="flex-1 mr-2">
+            <div class="flex items-center gap-1.5">
+              <span class="font-black text-slate-800 text-xs">#${item.locker_number.toString().padStart(2, '0')}</span>
+              <span class="font-bold text-slate-700 text-xs truncate max-w-[130px]">${item.product_name || 'Insumo'}</span>
+            </div>
+            <div class="text-[11px] text-slate-500 mt-1 flex items-center gap-2">
+              <span>Cant: <strong class="text-blue-600 font-bold">${item.quantity}</strong></span>
+              <span>•</span>
+              <span>$${unitP.toFixed(2)} c/u</span>
+              <span>•</span>
+              <span class="font-bold text-slate-800">Subtotal: $${subtotal.toFixed(2)}</span>
+            </div>
           </div>
-          <div class="text-[11px] text-slate-500 mt-0.5">
-            Cantidad: <strong class="text-blue-600 font-bold">${item.quantity}</strong> pza(s)
-          </div>
+          <button onclick="Cart.remove(${item.id})" class="text-rose-500 hover:text-rose-700 font-bold text-xs p-1">
+            ✕
+          </button>
         </div>
-        <button onclick="Cart.remove(${item.id})" class="text-rose-500 hover:text-rose-700 font-bold text-xs p-1">
-          ✕
-        </button>
-      </div>
-    `).join('');
+      `;
+    }).join('');
   },
 
   async checkout() {

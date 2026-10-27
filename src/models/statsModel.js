@@ -2,16 +2,18 @@
 const db = require('../config/database');
 
 const StatsModel = {
-  // 1. Insumos más retirados (Consumo total por producto)
+  /**
+   * 1. Insumos más retirados (Consumo total por producto)
+   */
   async getTopProducts() {
     const query = `
       SELECT 
-        l.product_name,
+        COALESCE(NULLIF(TRIM(l.product_name), ''), 'Sin Asignar') AS product_name,
         SUM(ABS(m.quantity_changed)) AS total_withdrawn
       FROM inventory_logs m
       JOIN lockers l ON m.locker_id = l.id
       WHERE m.action_type = 'RETIRO' AND m.quantity_changed < 0
-      GROUP BY l.product_name
+      GROUP BY COALESCE(NULLIF(TRIM(l.product_name), ''), 'Sin Asignar')
       ORDER BY total_withdrawn DESC
       LIMIT 6;
     `;
@@ -19,7 +21,9 @@ const StatsModel = {
     return rows;
   },
 
-  // 2. Actividad y volumen retirado por empleado
+  /**
+   * 2. Actividad y volumen retirado por empleado/operador
+   */
   async getUserActivity() {
     const query = `
       SELECT 

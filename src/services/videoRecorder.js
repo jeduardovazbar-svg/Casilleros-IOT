@@ -3,6 +3,17 @@ const { spawn } = require('child_process');
 const fs = require('fs');
 const path = require('path');
 
+// Resolver binario de FFmpeg (soporta ffmpeg-static de node_modules o ffmpeg global en PATH)
+let ffmpegBinary = 'ffmpeg';
+try {
+  const staticFfmpeg = require('ffmpeg-static');
+  if (staticFfmpeg && fs.existsSync(staticFfmpeg)) {
+    ffmpegBinary = staticFfmpeg;
+  }
+} catch (e) {
+  ffmpegBinary = 'ffmpeg';
+}
+
 // Carpeta donde se almacenarán las grabaciones (en la raíz del proyecto)
 const RECORDINGS_DIR = path.join(__dirname, '../../storage/recordings');
 if (!fs.existsSync(RECORDINGS_DIR)) {
@@ -39,7 +50,7 @@ const VideoRecorder = {
       filePath
     ];
 
-    const ffmpegProcess = spawn('ffmpeg', ffmpegArgs);
+    const ffmpegProcess = spawn(ffmpegBinary, ffmpegArgs);
 
     // 1. Manejo de error si el ejecutable de FFmpeg falla o no se encuentra en el sistema
     ffmpegProcess.on('error', (err) => {

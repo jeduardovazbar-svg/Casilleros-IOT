@@ -1,84 +1,141 @@
 // src/controllers/userController.js
-const db = require('../config/database');
 const UserModel = require('../models/userModel');
 const { success, error } = require('../utils/responseHelper');
-const bcrypt = require('bcrypt'); // Si tu proyecto usa bcryptjs, pon require('bcryptjs')
+const bcrypt = require('bcrypt');
 
 const UserController = {
-  async createUser(req, res) {
-    const { 
-      admin_id, 
-      username, 
-      pin, 
-      role, 
-      assigned_locker_id, 
-      allowed_qty,
-      email, 
-      phone 
-    } = req.body;
-
-    const cleanPin = String(pin || '').trim();
-
-    // 1. Validaciones básicas de formato
-    if (!admin_id || !username || !cleanPin || !role) {
-      return error(res, 'Faltan campos requeridos (nombre, PIN o rol)', 400);
-    }
-
-    if (cleanPin.length !== 4 || isNaN(cleanPin)) {
-      return error(res, 'El PIN debe ser exactamente de 4 dígitos numéricos', 400);
-    }
-
+  /**
+   * GET /api/users
+   * Lista todos los usuarios (sin hashes) para administración
+   */
+  async getAllUsers(req, res) {
     try {
-      // 2. Validar que quien crea el usuario sea Administrador
-      const admin = await UserModel.findById(admin_id);
-      if (!admin || admin.role !== 'admin') {
-        return error(res, 'Acceso denegado: solo el administrador puede registrar cuentas', 403);
+      const users = await UserModel.getAll();
+      return success(res, users, 'Usuarios recuperados correctamente');
+    } catch (err) {
+      console.error('Error al listar usuarios:', err);
+      return error(res, 'Error al consultar usuarios', 500, err.message);
+    }
+  },
+
+  /**
+   * POST /api/users (y usado por /api/auth/register)
+   * Creación validada y jerárquica de cuentas
+   */
+  async createUser(req, res) {
+    try {
+      const { 
+        admin_id,
+        creator_id,
+        username, 
+        pin, 
+        role, 
+        assigned_locker_id, 
+        allowed_qty,
+        email, 
+        phone 
+      } = req.body;
+
+      const effectiveCreatorId = admin_id || creator_id;
+      const cleanUsername = String(username || '').trim();
+      const cleanPin = String(pin || '').trim();
+      const cleanRole = String(role || '').trim().toLowerCase();
+
+      // 1. Validaciones básicas de campos obligatorios
+      if (!effectiveCreatorId || !cleanUsername || !cleanPin || !cleanRole) {
+        return error(res, 'Faltan campos requeridos (creador, nombre, PIN o rol)', 400);
       }
 
-      // 3. Validar que el nombre de usuario no esté repetido
-      const [existingUser] = await db.query('SELECT id FROM users WHERE username = ?', [username.trim()]);
-      if (existingUser.length > 0) {
+      // 2. Validación de PIN (4 dígitos numéricos)
+      if (cleanPin.length !== 4 || !/^\d{4}$/.test(cleanPin)) {
+        return error(res, 'El PIN debe ser exactamente de 4 dígitos numéricos', 400);
+      }
+
+      // 3. Validación de rol válido
+      const validRoles = ['admin', 'operador', 'empleado'];
+      if (!validRoles.includes(cleanRole)) {
+        return error(res, 'Rol inválido. Opciones permitidas: admin, operador, empleado', 400);
+      }
+
+      // 4. Validar permisos jerárquicos del creador
+      const creator = await UserModel.findById(effectiveCreatorId);
+      if (!creator || !creator.is_active) {
+        return error(res, 'Usuario creador no encontrado o inactivo', 401);
+      }
+
+      // Empleado no puede crear usuarios
+      if (creator.role === 'empleado') {
+        return error(res, 'Sin privilegios para registrar usuarios', 403);
+      }
+
+      // Operador únicamente puede registrar empleados
+      if (creator.role === 'operador' && cleanRole !== 'empleado') {
+        return error(res, 'Los operadores únicamente tienen permiso para registrar empleados', 403);
+      }
+
+      // 5. Validar que el nombre de usuario no esté repetido
+      const existingUser = await UserModel.findByUsername(cleanUsername);
+      if (existingUser) {
         return error(res, 'El nombre de usuario ya está registrado', 409);
       }
 
-      // 4. Validar que el PIN no pertenezca a otro usuario
-      // Al estar cifrados con salt en MySQL, comparamos contra los usuarios activos
-      const [users] = await db.query('SELECT id, pin_hash FROM users WHERE is_active = 1');
-      for (const u of users) {
-        const isMatch = await bcrypt.compare(cleanPin, u.pin_hash);
-        if (isMatch) {
-          return error(res, 'El PIN ya está en uso por otro operador. Elige uno diferente.', 409);
+      // 6. Validar que el PIN no pertenezca a otro usuario activo
+      const activeUsers = await UserModel.getAllActive();
+      for (const u of activeUsers) {
+        if (await bcrypt.compare(cleanPin, u.pin_hash)) {
+          return error(res, 'El PIN ya está en uso por otro usuario. Elige uno diferente.', 409);
         }
       }
 
-      // 5. Cifrar el nuevo PIN con 10 rondas de salteo
+      // 7. Cifrar el PIN con 10 rondas de salteo
       const hashedPin = await bcrypt.hash(cleanPin, 10);
 
-      // 6. Insertar en la columna correcta: pin_hash
-      const [result] = await db.query(
-        `INSERT INTO users (username, pin_hash, role, assigned_locker_id, allowed_qty, email, phone, created_by, is_active)
-         VALUES (?, ?, ?, ?, ?, ?, ?, ?, 1)`,
-        [
-          username.trim(),
-          hashedPin,
-          role,
-          role === 'empleado' ? (assigned_locker_id || null) : null,
-          role === 'empleado' ? (allowed_qty || 1) : 0,
-          email ? email.trim() : null,
-          phone ? phone.trim() : null,
-          admin_id
-        ]
-      );
+      // 8. Crear en la base de datos a través del modelo
+      const newUserId = await UserModel.create({
+        username: cleanUsername,
+        pinHash: hashedPin,
+        role: cleanRole,
+        createdBy: effectiveCreatorId,
+        assignedLockerId: cleanRole === 'empleado' ? (parseInt(assigned_locker_id, 10) || null) : null,
+        allowedQty: cleanRole === 'empleado' ? (parseInt(allowed_qty, 10) || 1) : 0,
+        email: email ? String(email).trim() : null,
+        phone: phone ? String(phone).trim() : null,
+        isActive: 1
+      });
 
       return success(res, {
-        id: result.insertId,
-        username,
-        role
+        id: newUserId,
+        username: cleanUsername,
+        role: cleanRole
       }, 'Usuario creado exitosamente', 201);
 
     } catch (err) {
       console.error('Error al registrar usuario:', err);
       return error(res, 'Error interno al registrar usuario', 500, err.message);
+    }
+  },
+
+  /**
+   * DELETE /api/users/:id
+   * Desactivación lógica de un usuario (soft-delete)
+   */
+  async deactivateUser(req, res) {
+    try {
+      const { id } = req.params;
+      const { admin_id, user_id } = req.body;
+      const requesterId = admin_id || user_id;
+
+      const admin = await UserModel.findById(requesterId);
+      if (!admin || admin.role !== 'admin') {
+        return error(res, 'Acceso denegado: solo el Administrador puede desactivar usuarios', 403);
+      }
+
+      const ok = await UserModel.deactivate(id);
+      if (!ok) return error(res, 'Usuario no encontrado o ya inactivo', 404);
+
+      return success(res, null, 'Usuario desactivado correctamente');
+    } catch (err) {
+      return error(res, 'Error al desactivar usuario', 500, err.message);
     }
   }
 };

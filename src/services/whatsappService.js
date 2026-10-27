@@ -47,26 +47,30 @@ client.on('auth_failure', (msg) => {
 client.on('disconnected', (reason) => {
   isClientReady = false;
   console.warn('[WHATSAPP] Cliente desconectado:', reason);
-  // Reintento de inicialización si se cae
-  client.initialize();
+  client.initialize().catch(err => {
+    console.warn('[WHATSAPP] Falló reintento de inicialización:', err.message);
+  });
 });
 
-// Iniciar el cliente al arrancar Node.js
-client.initialize();
+// Iniciar el cliente al arrancar Node.js de forma protegida
+client.initialize().catch(err => {
+  console.warn('[WHATSAPP] Inicialización diferida o en espera de sesión:', err.message);
+});
 
 /**
- * Enviar mensaje de comprobante
+ * Enviar mensaje de comprobante con desglose de precios unitarios y total
  * @param {string} rawPhone - Número del usuario (10 dígitos o con lada)
  * @param {string} username - Nombre del usuario
  * @param {Array} items - Lista de artículos retirados
+ * @param {number} totalAmount - Monto total acumulado
  */
-async function sendWhatsAppMessage(rawPhone, username, items) {
+async function sendWhatsAppMessage(rawPhone, username, items, totalAmount) {
   if (!isClientReady) {
     console.warn('[WHATSAPP] El cliente aún no está listo o la sesión no está activa.');
     return false;
   }
 
-  if (!rawPhone) return false;
+  if (!rawPhone || !Array.isArray(items) || items.length === 0) return false;
 
   try {
     // 1. Limpieza del número: quitar espacios, guiones y signos +
@@ -84,19 +88,28 @@ async function sendWhatsAppMessage(rawPhone, username, items) {
       return false;
     }
 
-    // 3. Redactar el mensaje con formato
+    // 3. Redactar el mensaje con desglose de precios individuales y totales
     const itemsList = items
-      .map(i => `• Casillero #${String(i.locker_number).padStart(2, '0')}: *${i.product_name}* (${i.quantity} pza/s)`)
+      .map(i => {
+        const unitPrice = parseFloat(i.unit_price) || 0;
+        const subtotal = parseFloat(i.subtotal) || (unitPrice * i.quantity);
+        return `• Casillero #${String(i.locker_number).padStart(2, '0')}: *${i.product_name}* x${i.quantity} | $${unitPrice.toFixed(2)} c/u -> Subtotal: $${subtotal.toFixed(2)}`;
+      })
       .join('\n');
+
+    const total = totalAmount !== undefined 
+      ? parseFloat(totalAmount) 
+      : items.reduce((acc, i) => acc + (parseFloat(i.subtotal) || ((parseFloat(i.unit_price) || 0) * i.quantity)), 0);
 
     const message = 
 `*EDCAM TECHNOLOGIES • SMART AUTOMATION*
 _Comprobante de Dispensación_
 
-Hola *${username}*, tu pedido ha sido retirado con éxito:
+Hola *${username}*, tu pedido ha sido dispensado con éxito:
 
 ${itemsList}
 
+💰 *Total de la Venta:* $${total.toFixed(2)}
 🕒 *Hora:* ${new Date().toLocaleTimeString()}
 📅 *Fecha:* ${new Date().toLocaleDateString()}
 
@@ -107,7 +120,7 @@ ${itemsList}
     console.log(`[WHATSAPP] Notificación enviada correctamente a: ${cleanNumber}`);
     return true;
   } catch (error) {
-    console.error('[WHATSAPP] Error al enviar mensaje:', error);
+    console.error('[WHATSAPP] Error al enviar mensaje:', error.message);
     return false;
   }
 }

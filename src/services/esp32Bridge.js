@@ -1,6 +1,7 @@
 // src/services/esp32Bridge.js
 const WebSocket = require('ws');
 const LockerModel = require('../models/lockerModel');
+const MovementModel = require('../models/movementModel');
 const VideoRecorder = require('./videoRecorder');
 
 let esp32Socket = null;
@@ -50,7 +51,7 @@ const Esp32Bridge = {
           // B. Reporte de telemetría de sensores magnéticos y control de cámara
           if (data.type === 'DOOR_STATUS_UPDATE') {
             const { box, status } = data;
-            let videoData = null; // 👈 Declarada al inicio para evitar ReferenceError
+            let videoData = null;
             
             // Actualizar estado en la base de datos
             if (LockerModel && typeof LockerModel.updateDoorStatus === 'function') {
@@ -79,8 +80,11 @@ const Esp32Bridge = {
 
               if (videoData) {
                 console.log(`[AUDITORÍA] Video listo para vincular: ${videoData.filename}`);
-                // Si tienes modelo de movimientos para guardar la ruta del video:
-                // await MovementModel.attachVideo(box, videoData.url);
+                try {
+                  await MovementModel.attachVideo(box, videoData.filename);
+                } catch (vErr) {
+                  console.warn('[AUDITORÍA] No se pudo adjuntar video al log:', vErr.message);
+                }
               }
             }
             else if (status === 'alerta_abierta') {

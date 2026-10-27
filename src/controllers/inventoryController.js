@@ -4,7 +4,6 @@ const { sendEmailReceipt } = require('../services/notificationService');
 const { sendWhatsAppMessage } = require('../services/whatsappService');
 const UserModel = require('../models/userModel');
 const LockerModel = require('../models/lockerModel');
-const ProductModel = require('../models/productModel');
 const MovementModel = require('../models/movementModel');
 const esp32Bridge = require('../services/esp32Bridge');
 const { success, error } = require('../utils/responseHelper');
@@ -48,8 +47,10 @@ const InventoryController = {
 
       const stockBefore = locker.current_stock;
       const stockAfter = stockBefore - qty;
+      const unitPrice = parseFloat(locker.price) || 0;
+      const subtotal = unitPrice * qty;
 
-      await ProductModel.updateStock(locker_id, stockAfter, conn);
+      await LockerModel.updateStock(locker_id, stockAfter, conn);
 
       await MovementModel.log({
         lockerId: locker_id,
@@ -58,7 +59,7 @@ const InventoryController = {
         quantityChanged: -qty,
         stockBefore,
         stockAfter,
-        notes: `Retiro autorizado para rol: ${user.role}`
+        notes: `Retiro autorizado (${user.role}) - P.Unit: $${unitPrice.toFixed(2)} Subtotal: $${subtotal.toFixed(2)}`
       }, conn);
 
       await conn.commit();
@@ -66,26 +67,34 @@ const InventoryController = {
       // Disparo físico del relé vía Modbus Función 0x06
       esp32Bridge.triggerLock(locker.locker_number, locker.board_id, locker.relay_channel, 1000);
 
-      // Despacho de notificaciones en segundo plano (Email y WhatsApp)
+      // Despacho de notificaciones en segundo plano con desglose de precios
       const receiptItem = [{
         locker_number: locker.locker_number,
         product_name: locker.product_name || 'Insumo',
-        quantity: qty
+        quantity: qty,
+        unit_price: unitPrice,
+        subtotal: subtotal
       }];
 
       if (user.email) {
-        sendEmailReceipt({ to: user.email, username: user.username, items: receiptItem })
-          .catch(err => console.error('[NOTIFICACIONES] Error al enviar email:', err.message));
+        sendEmailReceipt({ 
+          to: user.email, 
+          username: user.username, 
+          items: receiptItem, 
+          totalAmount: subtotal 
+        }).catch(err => console.error('[NOTIFICACIONES] Error al enviar email:', err.message));
       }
 
       if (user.phone) {
-        sendWhatsAppMessage(user.phone, user.username, receiptItem)
+        sendWhatsAppMessage(user.phone, user.username, receiptItem, subtotal)
           .catch(err => console.error('[NOTIFICACIONES] Error al enviar WhatsApp:', err.message));
       }
 
       return success(res, {
         locker_number: locker.locker_number,
         withdrawn: qty,
+        unit_price: unitPrice,
+        subtotal: subtotal,
         stock_remaining: stockAfter
       }, `Casillero #${locker.locker_number} abierto exitosamente`);
 
@@ -115,6 +124,7 @@ const InventoryController = {
       if (!user || !user.is_active) throw new Error('Usuario no autorizado o inactivo');
 
       const processedItems = [];
+      let totalAmount = 0;
 
       // Validar y descontar cada artículo dentro de la misma transacción
       for (const item of items) {
@@ -139,8 +149,11 @@ const InventoryController = {
 
         const stockBefore = locker.current_stock;
         const stockAfter = stockBefore - qty;
+        const unitPrice = parseFloat(locker.price) || 0;
+        const subtotal = unitPrice * qty;
+        totalAmount += subtotal;
 
-        await ProductModel.updateStock(targetLockerId, stockAfter, conn);
+        await LockerModel.updateStock(targetLockerId, stockAfter, conn);
 
         await MovementModel.log({
           lockerId: targetLockerId,
@@ -149,7 +162,7 @@ const InventoryController = {
           quantityChanged: -qty,
           stockBefore,
           stockAfter,
-          notes: `Retiro consolidado vía Carrito Kiosco (${user.role})`
+          notes: `Retiro consolidado vía Carrito (${user.role}) - P.Unit: $${unitPrice.toFixed(2)} Subtotal: $${subtotal.toFixed(2)}`
         }, conn);
 
         processedItems.push({
@@ -157,7 +170,9 @@ const InventoryController = {
           board_id: locker.board_id,
           relay_channel: locker.relay_channel,
           product_name: locker.product_name || 'Insumo',
-          quantity: qty
+          quantity: qty,
+          unit_price: unitPrice,
+          subtotal: subtotal
         });
       }
 
@@ -172,19 +187,24 @@ const InventoryController = {
         }
       })();
 
-      // Enviar una sola notificación consolidada por Email y WhatsApp
+      // Enviar una sola notificación consolidada por Email y WhatsApp con desglose de precios y total
       if (user.email) {
-        sendEmailReceipt({ to: user.email, username: user.username, items: processedItems })
-          .catch(err => console.error('[NOTIFICACIONES] Error al enviar email:', err.message));
+        sendEmailReceipt({ 
+          to: user.email, 
+          username: user.username, 
+          items: processedItems,
+          totalAmount: totalAmount
+        }).catch(err => console.error('[NOTIFICACIONES] Error al enviar email:', err.message));
       }
 
       if (user.phone) {
-        sendWhatsAppMessage(user.phone, user.username, processedItems)
+        sendWhatsAppMessage(user.phone, user.username, processedItems, totalAmount)
           .catch(err => console.error('[NOTIFICACIONES] Error al enviar WhatsApp:', err.message));
       }
 
       return success(res, {
         total_items: processedItems.length,
+        total_amount: totalAmount,
         items: processedItems
       }, 'Pedido procesado con éxito y casilleros liberados');
 
@@ -201,7 +221,7 @@ const InventoryController = {
   // ==========================================
   async restock(req, res) {
     try {
-      const { user_id, locker_id, quantity, product_name } = req.body;
+      const { user_id, locker_id, quantity, product_name, price } = req.body;
       const qty = parseInt(quantity, 10);
 
       const user = await UserModel.findById(user_id);
@@ -215,11 +235,14 @@ const InventoryController = {
       const stockBefore = locker.current_stock;
       const stockAfter = stockBefore + (isNaN(qty) ? 0 : qty);
 
-      if (product_name) {
-        await ProductModel.assignProduct(locker_id, product_name);
+      const parsedPrice = price !== undefined && price !== null && price !== '' ? parseFloat(price) : null;
+      const targetProductName = product_name !== undefined ? product_name : locker.product_name;
+
+      if (product_name !== undefined || parsedPrice !== null) {
+        await LockerModel.assignProduct(locker_id, targetProductName, parsedPrice);
       }
 
-      await ProductModel.updateStock(locker_id, stockAfter);
+      await LockerModel.updateStock(locker_id, stockAfter);
 
       if (!isNaN(qty) && qty > 0) {
         await MovementModel.log({
@@ -229,11 +252,15 @@ const InventoryController = {
           quantityChanged: qty,
           stockBefore,
           stockAfter,
-          notes: 'Reabastecimiento registrado por admin'
+          notes: `Reabastecimiento registrado por admin${parsedPrice !== null ? ` (Precio: $${parsedPrice.toFixed(2)})` : ''}`
         });
       }
 
-      return success(res, { locker_id, new_stock: stockAfter }, 'Casillero reabastecido correctamente');
+      return success(res, { 
+        locker_id, 
+        new_stock: stockAfter, 
+        price: parsedPrice !== null ? parsedPrice : locker.price 
+      }, 'Casillero reabastecido correctamente');
     } catch (err) {
       return error(res, 'Error al resurtir el casillero', 500, err.message);
     }
