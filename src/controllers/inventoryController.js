@@ -7,24 +7,32 @@ const LockerModel = require('../models/lockerModel');
 const MovementModel = require('../models/movementModel');
 const esp32Bridge = require('../services/esp32Bridge');
 const { success, error } = require('../utils/responseHelper');
+const logger = require('../core/logger');
 
 const InventoryController = {
   // ==========================================
   // 1. RETIRO INDIVIDUAL (DESDE MODAL)
   // ==========================================
   async withdraw(req, res) {
-    const { user_id, locker_id, quantity } = req.body;
+    const effectiveUserId = req.user?.id || req.body.user_id;
+    const { locker_id, quantity } = req.body;
     const qty = parseInt(quantity, 10);
 
-    if (!user_id || !locker_id || isNaN(qty) || qty <= 0) {
+    if (!effectiveUserId || !locker_id || isNaN(qty) || qty <= 0) {
       return error(res, 'Datos de retiro incompletos o cantidad inválida', 400);
+    }
+
+    // Pre-flight check: Verificar hardware antes de bloquear la base de datos
+    if (!esp32Bridge.isConnected()) {
+      logger.warn('INVENTARIO', 'Intento de retiro rechazado: ESP32 MAIN fuera de línea');
+      return error(res, 'El casillero físico no está disponible en este momento (ESP32 Offline)', 503);
     }
 
     const conn = await db.getConnection();
     try {
       await conn.beginTransaction();
 
-      const user = await UserModel.findById(user_id);
+      const user = await UserModel.findById(effectiveUserId);
       if (!user || !user.is_active) throw new Error('Usuario no autorizado o inactivo');
 
       // Restricciones de rol Empleado
@@ -54,7 +62,7 @@ const InventoryController = {
 
       await MovementModel.log({
         lockerId: locker_id,
-        userId: user_id,
+        userId: effectiveUserId,
         actionType: 'RETIRO',
         quantityChanged: -qty,
         stockBefore,
@@ -66,8 +74,9 @@ const InventoryController = {
 
       // Disparo físico del relé vía Modbus Función 0x06
       esp32Bridge.triggerLock(locker.locker_number, locker.board_id, locker.relay_channel, 1000);
+      logger.info('INVENTARIO', `Retiro exitoso de ${qty} pzas en casillero #${locker.locker_number} por ${user.username}`);
 
-      // Despacho de notificaciones en segundo plano con desglose de precios
+      // Despacho de notificaciones asíncronas
       const receiptItem = [{
         locker_number: locker.locker_number,
         product_name: locker.product_name || 'Insumo',
@@ -82,12 +91,12 @@ const InventoryController = {
           username: user.username, 
           items: receiptItem, 
           totalAmount: subtotal 
-        }).catch(err => console.error('[NOTIFICACIONES] Error al enviar email:', err.message));
+        }).catch(err => logger.error('EMAIL', `Error al enviar recibo: ${err.message}`));
       }
 
       if (user.phone) {
         sendWhatsAppMessage(user.phone, user.username, receiptItem, subtotal)
-          .catch(err => console.error('[NOTIFICACIONES] Error al enviar WhatsApp:', err.message));
+          .catch(err => logger.error('WHATSAPP', `Error al enviar WhatsApp: ${err.message}`));
       }
 
       return success(res, {
@@ -100,6 +109,7 @@ const InventoryController = {
 
     } catch (err) {
       await conn.rollback();
+      logger.warn('INVENTARIO', `Fallo en retiro: ${err.message}`);
       return error(res, err.message, 400);
     } finally {
       conn.release();
@@ -110,35 +120,55 @@ const InventoryController = {
   // 2. CHECKOUT MULTI-PRODUCTO (CARRITO TIPO AMAZON)
   // =======================================================
   async checkout(req, res) {
-    const { user_id, items } = req.body; // items: [{ id / locker_id, quantity }]
+    const effectiveUserId = req.user?.id || req.body.user_id;
+    const { items } = req.body; // items: [{ id / locker_id, quantity }]
 
-    if (!user_id || !Array.isArray(items) || items.length === 0) {
+    if (!effectiveUserId || !Array.isArray(items) || items.length === 0) {
       return error(res, 'El carrito está vacío o faltan datos del usuario', 400);
+    }
+
+    // Pre-flight check de hardware
+    if (!esp32Bridge.isConnected()) {
+      logger.warn('INVENTARIO', 'Checkout rechazado: ESP32 MAIN fuera de línea');
+      return error(res, 'El casillero físico no está disponible en este momento (ESP32 Offline)', 503);
     }
 
     const conn = await db.getConnection();
     try {
       await conn.beginTransaction();
 
-      const user = await UserModel.findById(user_id);
+      const user = await UserModel.findById(effectiveUserId);
       if (!user || !user.is_active) throw new Error('Usuario no autorizado o inactivo');
+
+      // Validación de cuota acumulada para rol Empleado
+      let totalRequestedQty = 0;
+      for (const item of items) {
+        const targetLockerId = Number(item.locker_id || item.id);
+        const qty = parseInt(item.quantity, 10);
+
+        if (isNaN(qty) || qty <= 0) {
+          throw new Error('Hay artículos con cantidades inválidas en el pedido');
+        }
+
+        if (user.role === 'empleado') {
+          if (Number(user.assigned_locker_id) !== targetLockerId) {
+            throw new Error(`No tienes permisos para retirar del casillero ID ${targetLockerId}`);
+          }
+          totalRequestedQty += qty;
+        }
+      }
+
+      if (user.role === 'empleado' && totalRequestedQty > user.allowed_qty) {
+        throw new Error(`La cantidad total solicitada (${totalRequestedQty} pzas) excede tu cuota permitida (${user.allowed_qty} pzas)`);
+      }
 
       const processedItems = [];
       let totalAmount = 0;
 
-      // Validar y descontar cada artículo dentro de la misma transacción
+      // Descontar cada artículo dentro de la misma transacción
       for (const item of items) {
-        const targetLockerId = item.locker_id || item.id;
+        const targetLockerId = Number(item.locker_id || item.id);
         const qty = parseInt(item.quantity, 10);
-
-        if (!targetLockerId || isNaN(qty) || qty <= 0) {
-          throw new Error('Hay artículos con cantidades inválidas en el pedido');
-        }
-
-        // Restricción de empleado
-        if (user.role === 'empleado' && Number(user.assigned_locker_id) !== Number(targetLockerId)) {
-          throw new Error(`No tienes permisos para retirar del casillero ID ${targetLockerId}`);
-        }
 
         const locker = await LockerModel.findByIdForUpdate(targetLockerId, conn);
         if (!locker) throw new Error(`El casillero con ID ${targetLockerId} no existe`);
@@ -157,7 +187,7 @@ const InventoryController = {
 
         await MovementModel.log({
           lockerId: targetLockerId,
-          userId: user_id,
+          userId: effectiveUserId,
           actionType: 'RETIRO',
           quantityChanged: -qty,
           stockBefore,
@@ -177,29 +207,29 @@ const InventoryController = {
       }
 
       await conn.commit();
+      logger.info('INVENTARIO', `Checkout completado: ${processedItems.length} artículos por ${user.username}`);
 
-      // Disparar las aperturas en secuencia separada por 800ms
-      // para proteger la fuente de 12V sin demorar la respuesta a la pantalla
+      // Disparar las aperturas en secuencia separada por 800ms para proteger la fuente de 12V
       (async () => {
         for (const item of processedItems) {
           esp32Bridge.triggerLock(item.locker_number, item.board_id, item.relay_channel, 1000);
           await new Promise(resolve => setTimeout(resolve, 800));
         }
-      })();
+      })().catch(err => logger.error('MODBUS', 'Fallo en secuencia de apertura física', err));
 
-      // Enviar una sola notificación consolidada por Email y WhatsApp con desglose de precios y total
+      // Notificaciones consolidadas
       if (user.email) {
         sendEmailReceipt({ 
           to: user.email, 
           username: user.username, 
           items: processedItems,
           totalAmount: totalAmount
-        }).catch(err => console.error('[NOTIFICACIONES] Error al enviar email:', err.message));
+        }).catch(err => logger.error('EMAIL', `Error al enviar recibo: ${err.message}`));
       }
 
       if (user.phone) {
         sendWhatsAppMessage(user.phone, user.username, processedItems, totalAmount)
-          .catch(err => console.error('[NOTIFICACIONES] Error al enviar WhatsApp:', err.message));
+          .catch(err => logger.error('WHATSAPP', `Error al enviar WhatsApp: ${err.message}`));
       }
 
       return success(res, {
@@ -210,6 +240,7 @@ const InventoryController = {
 
     } catch (err) {
       await conn.rollback();
+      logger.warn('INVENTARIO', `Fallo en checkout: ${err.message}`);
       return error(res, err.message, 400);
     } finally {
       conn.release();
@@ -221,10 +252,11 @@ const InventoryController = {
   // ==========================================
   async restock(req, res) {
     try {
-      const { user_id, locker_id, quantity, product_name, price } = req.body;
+      const effectiveUserId = req.user?.id || req.body.user_id;
+      const { locker_id, quantity, product_name, price } = req.body;
       const qty = parseInt(quantity, 10);
 
-      const user = await UserModel.findById(user_id);
+      const user = await UserModel.findById(effectiveUserId);
       if (!user || user.role !== 'admin') {
         return error(res, 'Acceso denegado: solo el Administrador puede reabastecer stock', 403);
       }
@@ -247,7 +279,7 @@ const InventoryController = {
       if (!isNaN(qty) && qty > 0) {
         await MovementModel.log({
           lockerId: locker_id,
-          userId: user_id,
+          userId: effectiveUserId,
           actionType: 'SURTIDO',
           quantityChanged: qty,
           stockBefore,
@@ -256,12 +288,15 @@ const InventoryController = {
         });
       }
 
+      logger.info('INVENTARIO', `Reabastecimiento en casillero #${locker.locker_number}. Nuevo stock: ${stockAfter}`);
+
       return success(res, { 
         locker_id, 
         new_stock: stockAfter, 
         price: parsedPrice !== null ? parsedPrice : locker.price 
       }, 'Casillero reabastecido correctamente');
     } catch (err) {
+      logger.error('INVENTARIO', 'Error al resurtir el casillero', err);
       return error(res, 'Error al resurtir el casillero', 500, err.message);
     }
   }

@@ -5,14 +5,15 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
   <title>Smart Locker WMS - EDCAM Technologies</title>
   
-  <!-- Dependencias Externas (Tailwind CSS, Chart.js, Fuentes) -->
-  <script src="https://cdn.tailwindcss.com"></script>
-  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+<!-- Dependencias Externas (Chart.js, Fuentes) -->
+  <script src="/js/chart.umd.js"></script>
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&display=swap" rel="stylesheet">
   
   <!-- Estilos Locales e Icono -->
   <link rel="icon" type="image/png" href="/img/edcam-icon.png">
+<!-- Cambia esta línea en tu index.html -->
+<link rel="stylesheet" href="/css/tailwind.min.css?v=2">
   <link rel="stylesheet" href="/css/style.css">
 
   <!-- Estilos base y utilidades de Glassmorphism responsivo -->
@@ -99,16 +100,16 @@
     
     <!-- 1. Video de fondo difuminado -->
     <video id="screensaver-video-ambient" 
-          class="absolute inset-0 w-full h-full object-cover blur-3xl opacity-35 scale-110 pointer-events-none" 
-          muted playsinline loop autoplay>
+           class="absolute inset-0 w-full h-full object-cover blur-3xl opacity-35 scale-110 pointer-events-none" 
+           muted playsinline loop autoplay>
       <source src="/videos/promocionalVideo1.mp4" type="video/mp4">
     </video>
 
     <!-- 2. Video principal adaptativo -->
     <video id="screensaver-video" 
-          class="absolute inset-0 z-10 w-full h-full object-contain pointer-events-none p-2 sm:p-6" 
-          style="transform: translateZ(0); will-change: transform; backface-visibility: hidden;" 
-          muted playsinline loop autoplay>
+           class="absolute inset-0 z-10 w-full h-full object-contain pointer-events-none p-2 sm:p-6" 
+           style="transform: translateZ(0); will-change: transform; backface-visibility: hidden;" 
+           muted playsinline loop autoplay>
       <source src="/videos/promocionalVideo1.mp4" type="video/mp4">
     </video>
 
@@ -170,7 +171,7 @@
           </div>
           <div>
             <h4 class="font-bold text-xs text-slate-800 uppercase tracking-tight">Digita tu PIN</h4>
-            <p class="text-[10px] text-slate-500 mt-0.5">Ingresa tu código de 4 dígitos.</p>
+            <p class="text-[10px] text-slate-500 mt-0.5">Ingresa tu código de 6 dígitos.</p>
           </div>
         </div>
 
@@ -236,7 +237,7 @@
   <!-- BLOQUE 2: VISTAS PRINCIPALES (LOGIN, DASHBOARD, CARRITO Y ÉXITO)    -->
   <!-- ================================================================= -->
 
-  <!-- 2.1 Vista: Terminal de Acceso (Teclado Numérico PIN) -->
+  <!-- 2.1 Vista: Terminal de Acceso (Teclado Numérico PIN de 6 Dígitos) -->
   <div id="view-login" class="hidden flex-col items-center justify-center min-h-screen min-h-dvh p-4 py-8 overflow-y-auto">
     <div class="w-full max-w-xs sm:max-w-sm my-auto">
       
@@ -248,8 +249,8 @@
                onerror="this.onerror=null; this.src='https://api.iconify.design/fluent-emoji-flat:robot.svg';">
         </div>
         <div class="liquid-glass px-4 py-2 rounded-2xl border border-white/80 shadow-md max-w-xs">
-          <p class="text-xs font-bold text-slate-800" id="bot-welcome-text">👋 ¡Hola! Bienvenido a EDCAM Locker.</p>
-          <p class="text-[11px] text-slate-500 font-medium">Ingresa tu PIN de 4 dígitos para acceder.</p>
+          <p class="text-xs font-bold text-slate-800" id="bot-welcome-text">¡Hola! Bienvenido a EDCAM Locker.</p>
+          <p class="text-[11px] text-slate-500 font-medium">Ingresa tu PIN de 6 dígitos para acceder.</p>
         </div>
       </div>
 
@@ -260,6 +261,8 @@
           <div id="dot-1" class="w-3.5 h-3.5 rounded-full border border-slate-300 bg-white shadow-inner transition-all duration-150"></div>
           <div id="dot-2" class="w-3.5 h-3.5 rounded-full border border-slate-300 bg-white shadow-inner transition-all duration-150"></div>
           <div id="dot-3" class="w-3.5 h-3.5 rounded-full border border-slate-300 bg-white shadow-inner transition-all duration-150"></div>
+          <div id="dot-4" class="w-3.5 h-3.5 rounded-full border border-slate-300 bg-white shadow-inner transition-all duration-150"></div>
+          <div id="dot-5" class="w-3.5 h-3.5 rounded-full border border-slate-300 bg-white shadow-inner transition-all duration-150"></div>
         </div>
 
         <div class="grid grid-cols-3 gap-2 sm:gap-2.5">
@@ -403,7 +406,7 @@
 
 
   <!-- ================================================================= -->
-  <!-- BLOQUE 3: MODALES DE OPERACIÓN DE CASILLERO                        -->
+  <!-- BLOQUE 3: MODALES DE OPERACIÓN DE CASILLERO                       -->
   <!-- ================================================================= -->
 
   <!-- 3.1 Modal: Retiro de Insumo Individual -->
@@ -516,7 +519,7 @@
 
 
   <!-- ================================================================= -->
-  <!-- BLOQUE 4: MODALES DE ADMINISTRACIÓN, AUDITORÍA Y ANALÍTICA         -->
+  <!-- BLOQUE 4: MODALES DE ADMINISTRACIÓN, AUDITORÍA Y ANALÍTICA        -->
   <!-- ================================================================= -->
 
   <!-- 4.1 Modal: Alta de Nuevo Usuario -->
@@ -548,8 +551,8 @@
         </div>
         <div class="grid grid-cols-2 gap-2.5">
           <div>
-            <label class="text-[11px] font-bold text-slate-600 block mb-1">PIN (4 Dígitos)</label>
-            <input type="password" id="cu-pin" maxlength="4" pattern="[0-9]{4}" inputmode="numeric" required placeholder="••••" class="glass-input w-full rounded-xl px-3 py-2 text-sm outline-none text-center font-mono font-bold tracking-widest">
+            <label class="text-[11px] font-bold text-slate-600 block mb-1">PIN (6 Dígitos)</label>
+            <input type="password" id="cu-pin" maxlength="6" pattern="[0-9]{6}" inputmode="numeric" required placeholder="••••••" class="glass-input w-full rounded-xl px-3 py-2 text-sm outline-none text-center font-mono font-bold tracking-widest">
           </div>
           <div>
             <label class="text-[11px] font-bold text-slate-600 block mb-1">Rol de Acceso</label>

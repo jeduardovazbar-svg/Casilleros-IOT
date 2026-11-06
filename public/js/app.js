@@ -2,6 +2,9 @@
 // ESTADO GLOBAL DEL KIOSCO
 // ==========================================
 let currentPin = '';
+let numeroIntentos = 0;
+let intentosBloqueo = 3;
+let pinBloqueado = false;
 let currentUser = null;
 let selectedLocker = null;
 let currentWithdrawQty = 1;
@@ -50,10 +53,11 @@ setInterval(() => {
 // TECLADO NUMÉRICO Y CONTROL DE ACCESO (PIN)
 // ==========================================
 function pressKey(k) {
-  if (currentPin.length < 4) {
+  if (pinBloqueado) return;
+  if (currentPin.length < 6) {
     currentPin += k;
     updatePinDots();
-    if (currentPin.length === 4) submitLogin();
+    if (currentPin.length === 6) submitLogin();
   }
 }
 
@@ -65,7 +69,7 @@ function clearPin() {
 }
 
 function updatePinDots() {
-  for (let i = 0; i < 4; i++) {
+  for (let i = 0; i < 6; i++) {
     const dot = document.getElementById(`dot-${i}`);
     if (!dot) continue;
     if (i < currentPin.length) {
@@ -88,6 +92,32 @@ async function submitLogin() {
     if (!json.ok) {
       document.getElementById('login-error').innerText = json.error;
       clearPin();
+      numeroIntentos++;
+      
+      if (numeroIntentos >= intentosBloqueo) {
+        pinBloqueado = true;
+        for (let i = 0; i < 6; i++) {
+          const dot = document.getElementById(`dot-${i}`);
+          if (dot) {
+            dot.className = 'w-4 h-4 rounded-full border-2 border-rose-500 bg-rose-600 shadow-md shadow-rose-500/50 scale-110 transition-all duration-150';
+          }
+        }
+        document.getElementById('login-error').innerText = 'Demasiados intentos fallidos. Intenta más tarde.';
+        
+        // Notificar incidente de seguridad al backend para captura de video de 5 segundos
+        fetch('/api/auth/security-lockout', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ reason: 'PIN_FAILED_ATTEMPTS', attempts: numeroIntentos })
+        }).catch(() => {});
+
+        setTimeout(() => {
+          numeroIntentos = 0;
+          clearPin();
+          document.getElementById('login-error').innerText = '';
+          pinBloqueado = false;
+        }, 10000);
+      }
       return;
     }
 

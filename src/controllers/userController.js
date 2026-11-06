@@ -1,7 +1,9 @@
 // src/controllers/userController.js
 const UserModel = require('../models/userModel');
+const AuthService = require('../services/authService');
 const { success, error } = require('../utils/responseHelper');
 const bcrypt = require('bcrypt');
+const logger = require('../core/logger');
 
 const UserController = {
   /**
@@ -13,7 +15,7 @@ const UserController = {
       const users = await UserModel.getAll();
       return success(res, users, 'Usuarios recuperados correctamente');
     } catch (err) {
-      console.error('Error al listar usuarios:', err);
+      logger.error('USERS', 'Error al listar usuarios', err);
       return error(res, 'Error al consultar usuarios', 500, err.message);
     }
   },
@@ -36,7 +38,7 @@ const UserController = {
         phone 
       } = req.body;
 
-      const effectiveCreatorId = admin_id || creator_id;
+      const effectiveCreatorId = admin_id || creator_id || req.user?.id;
       const cleanUsername = String(username || '').trim();
       const cleanPin = String(pin || '').trim();
       const cleanRole = String(role || '').trim().toLowerCase();
@@ -46,9 +48,9 @@ const UserController = {
         return error(res, 'Faltan campos requeridos (creador, nombre, PIN o rol)', 400);
       }
 
-      // 2. Validación de PIN (4 dígitos numéricos)
-      if (cleanPin.length !== 4 || !/^\d{4}$/.test(cleanPin)) {
-        return error(res, 'El PIN debe ser exactamente de 4 dígitos numéricos', 400);
+      // 2. Validación de PIN (6 dígitos numéricos)
+      if (cleanPin.length !== 6 || !/^\d{6}$/.test(cleanPin)) {
+        return error(res, 'El PIN debe ser exactamente de 6 dígitos numéricos', 400);
       }
 
       // 3. Validación de rol válido
@@ -79,12 +81,13 @@ const UserController = {
         return error(res, 'El nombre de usuario ya está registrado', 409);
       }
 
-      // 6. Validar que el PIN no pertenezca a otro usuario activo
+      // 6. Validar que el PIN no pertenezca a otro usuario activo (en paralelo en libuv)
       const activeUsers = await UserModel.getAllActive();
-      for (const u of activeUsers) {
-        if (await bcrypt.compare(cleanPin, u.pin_hash)) {
-          return error(res, 'El PIN ya está en uso por otro usuario. Elige uno diferente.', 409);
-        }
+      const pinChecks = await Promise.all(
+        activeUsers.map(u => bcrypt.compare(cleanPin, u.pin_hash))
+      );
+      if (pinChecks.some(matches => matches)) {
+        return error(res, 'El PIN ya está en uso por otro usuario. Elige uno diferente.', 409);
       }
 
       // 7. Cifrar el PIN con 10 rondas de salteo
@@ -103,6 +106,10 @@ const UserController = {
         isActive: 1
       });
 
+      // Invalidar cachés de autenticación
+      AuthService.invalidateCache();
+      logger.info('USERS', `Nuevo usuario registrado: ${cleanUsername} (${cleanRole}) ID: ${newUserId}`);
+
       return success(res, {
         id: newUserId,
         username: cleanUsername,
@@ -110,7 +117,7 @@ const UserController = {
       }, 'Usuario creado exitosamente', 201);
 
     } catch (err) {
-      console.error('Error al registrar usuario:', err);
+      logger.error('USERS', 'Error al registrar usuario', err);
       return error(res, 'Error interno al registrar usuario', 500, err.message);
     }
   },
@@ -123,7 +130,7 @@ const UserController = {
     try {
       const { id } = req.params;
       const { admin_id, user_id } = req.body;
-      const requesterId = admin_id || user_id;
+      const requesterId = admin_id || user_id || req.user?.id;
 
       const admin = await UserModel.findById(requesterId);
       if (!admin || admin.role !== 'admin') {
@@ -133,8 +140,12 @@ const UserController = {
       const ok = await UserModel.deactivate(id);
       if (!ok) return error(res, 'Usuario no encontrado o ya inactivo', 404);
 
+      AuthService.invalidateCache();
+      logger.info('USERS', `Usuario ID ${id} desactivado por admin ID ${requesterId}`);
+
       return success(res, null, 'Usuario desactivado correctamente');
     } catch (err) {
+      logger.error('USERS', 'Error al desactivar usuario', err);
       return error(res, 'Error al desactivar usuario', 500, err.message);
     }
   }

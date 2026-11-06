@@ -2,50 +2,109 @@
 const db = require('./src/config/database');
 const bcrypt = require('bcrypt');
 
-async function seed() {
-  console.log('Conectando a la base de datos...');
+/**
+ * Catálogo de usuarios iniciales / administrativos
+ * NOTA CRÍTICA: Todos los PINs deben ser exactamente de 6 dígitos numéricos.
+ */
+const SEED_USERS = [
+  {
+    username: 'admin_general',
+    pin: '999999',
+    role: 'admin',
+    email: 'jeduardovazbar@gmail.com',
+    phone: '4493902776',
+    assignedLockerId: null,
+    allowedQty: 0
+  },
+  {
+    username: 'operador_turno1',
+    pin: '123456',
+    role: 'operador',
+    email: 'jeduardovazbar@gmail.com',
+    phone: '4493902776',
+    assignedLockerId: null,
+    allowedQty: 0
+  },
+  {
+    username: 'empleado_juan',
+    pin: '000001',
+    role: 'empleado',
+    email: 'jeduardovazbar@gmail.com',
+    phone: '4493902776',
+    assignedLockerId: 1,
+    allowedQty: 2
+  }
+];
 
-  // Hashes de prueba para los 3 roles
-  const pinAdmin = await bcrypt.hash('9999', 10);
-  const pinOperador = await bcrypt.hash('1234', 10);
-  const pinEmpleado = await bcrypt.hash('0001', 10);
+async function seedUser(user) {
+  const cleanPin = String(user.pin).trim();
+  if (!/^\d{6}$/.test(cleanPin)) {
+    throw new Error(`El usuario "${user.username}" tiene un PIN inválido ("${cleanPin}"). Debe ser estrictamente de 6 dígitos numéricos.`);
+  }
+
+  // 1. Cifrar el PIN (bcrypt.hash solo recibe el string del PIN y las rondas de salteo)
+  const pinHash = await bcrypt.hash(cleanPin, 10);
+
+  // 2. Insertar o actualizar todos los campos si el username ya existe (ON DUPLICATE KEY UPDATE)
+  const query = `
+    INSERT INTO users 
+      (username, pin_hash, role, email, phone, assigned_locker_id, allowed_qty, is_active)
+    VALUES (?, ?, ?, ?, ?, ?, ?, 1)
+    ON DUPLICATE KEY UPDATE 
+      pin_hash = VALUES(pin_hash),
+      role = VALUES(role),
+      email = VALUES(email),
+      phone = VALUES(phone),
+      assigned_locker_id = VALUES(assigned_locker_id),
+      allowed_qty = VALUES(allowed_qty),
+      is_active = 1;
+  `;
+
+  await db.query(query, [
+    user.username,
+    pinHash,
+    user.role,
+    user.email || null,
+    user.phone || null,
+    user.assignedLockerId || null,
+    user.allowedQty || 0
+  ]);
+}
+
+async function seed() {
+  console.log('==================================================');
+  console.log(' Conectando a MySQL para inicializar datos...');
+  console.log('==================================================');
 
   // 1. Casillero #1 físico
   await db.query(`
-    INSERT INTO lockers (locker_number, board_id, relay_channel, product_name, current_stock, max_capacity, size_type, grid_col_span, grid_row_span)
-    VALUES (1, 1, 1, 'Guantes de Nitrilo', 25, 50, 'S', 1, 1)
-    ON DUPLICATE KEY UPDATE current_stock = 25;
+    INSERT INTO lockers (locker_number, board_id, relay_channel, product_name, current_stock, max_capacity, size_type, grid_col_span, grid_row_span, price)
+    VALUES (1, 1, 1, 'Guantes de Nitrilo', 25, 50, 'S', 1, 1, 50.00)
+    ON DUPLICATE KEY UPDATE 
+      product_name = VALUES(product_name),
+      price = VALUES(price);
   `);
+  console.log('✔ Casillero #1 verificado.');
 
-  // 2. Administrador (Control total)
-  await db.query(`
-    INSERT INTO users (username, pin_hash, role)
-    VALUES ('admin_general', ?, 'admin')
-    ON DUPLICATE KEY UPDATE pin_hash = ?;
-  `, [pinAdmin, pinAdmin]);
+  // 2. Insertar o actualizar usuarios declarados
+  for (const u of SEED_USERS) {
+    await seedUser(u);
+    console.log(`✔ Usuario "${u.username}" (${u.role.toUpperCase()}) registrado/actualizado con PIN: ${u.pin}`);
+  }
 
-  // 3. Operador (Retiros generales y crea empleados)
-  await db.query(`
-    INSERT INTO users (username, pin_hash, role)
-    VALUES ('operador_turno1', ?, 'operador')
-    ON DUPLICATE KEY UPDATE pin_hash = ?;
-  `, [pinOperador, pinOperador]);
+  console.log('\n==================================================');
+  console.log(' ✔ BASE DE DATOS SINCRONIZADA CON ÉXITO');
+  console.log('==================================================');
+  console.log(' Usuarios disponibles para acceso por PIN:');
+  SEED_USERS.forEach(u => {
+    console.log(` • [${u.role.toUpperCase().padEnd(8)}] ${u.username.padEnd(16)} -> PIN: ${u.pin} | Correo: ${u.email || 'N/A'}`);
+  });
+  console.log('==================================================\n');
 
-  // 4. Empleado (Solo abre casillero 1 y retira hasta 2 piezas)
-  await db.query(`
-    INSERT INTO users (username, pin_hash, role, assigned_locker_id, allowed_qty)
-    VALUES ('empleado_juan', ?, 'empleado', 1, 2)
-    ON DUPLICATE KEY UPDATE pin_hash = ?;
-  `, [pinEmpleado, pinEmpleado]);
-
-  console.log('✔ Datos iniciales listos:');
-  console.log('  - Admin PIN:    9999');
-  console.log('  - Operador PIN: 1234');
-  console.log('  - Empleado PIN: 0001 (Locker 1, max 2 pzas)');
   process.exit(0);
 }
 
 seed().catch((err) => {
-  console.error('Error al ejecutar seed:', err);
+  console.error('\n❌ Error al ejecutar seed.js:', err.message);
   process.exit(1);
 });

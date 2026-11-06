@@ -2,8 +2,8 @@
 const { spawn } = require('child_process');
 const fs = require('fs');
 const path = require('path');
+const logger = require('../core/logger');
 
-// Resolver binario de FFmpeg (soporta ffmpeg-static de node_modules o ffmpeg global en PATH)
 let ffmpegBinary = 'ffmpeg';
 try {
   const staticFfmpeg = require('ffmpeg-static');
@@ -14,119 +14,170 @@ try {
   ffmpegBinary = 'ffmpeg';
 }
 
-// Carpeta donde se almacenarán las grabaciones (en la raíz del proyecto)
 const RECORDINGS_DIR = path.join(__dirname, '../../storage/recordings');
 if (!fs.existsSync(RECORDINGS_DIR)) {
   fs.mkdirSync(RECORDINGS_DIR, { recursive: true });
 }
 
-// Almacena las sesiones activas: { [boxId]: { process, filePath, filename, url, startTime } }
-const activeSessions = {};
+// Mapa de sesiones: boxId -> { process, filePath, filename, startTime, isDraining, closePromise }
+const activeSessions = new Map();
 
 const VideoRecorder = {
-  // Inicia la sesión de grabación para un casillero específico
   start(boxId) {
-    if (activeSessions[boxId]) {
-      console.warn(`[GRABADOR] Ya existe una grabación en curso para el casillero ${boxId}`);
+    if (activeSessions.has(boxId)) {
+      logger.warn('GRABADOR', `Casillero/Sesión #${boxId} ya cuenta con una sesión de video en curso.`);
       return;
     }
 
     const timestamp = new Date().toISOString().replace(/[:.]/g, '-');
-    const filename = `casillero_${boxId}_${timestamp}.mp4`;
+    const isSecurity = String(boxId).toLowerCase().includes('security') || String(boxId).toLowerCase().includes('seguridad');
+    const filename = isSecurity
+      ? `seguridad_bloqueo_${timestamp}.mp4`
+      : `casillero_${boxId}_${timestamp}.mp4`;
     const filePath = path.join(RECORDINGS_DIR, filename);
 
-    // Parámetros de FFmpeg optimizados para streaming continuo desde memoria
     const ffmpegArgs = [
-      '-y',                       // Sobrescribir archivo si existiera
-      '-loglevel', 'warning',     // Evitar saturación de búfer con logs de depuración
-      '-f', 'image2pipe',         // Formato de entrada: flujo continuo de imágenes
-      '-vcodec', 'mjpeg',         // Códec de entrada (fotogramas JPEG del ESP32-CAM)
-      '-r', '15',                 // Tasa aproximada de fotogramas por segundo (FPS)
-      '-i', '-',                  // Leer directamente desde stdin (tubería)
-      '-vcodec', 'libx264',       // Códec de salida H.264 compatible con navegadores y móviles
-      '-pix_fmt', 'yuv420p',      // Formato de píxel universal
-      '-preset', 'ultrafast',     // Codificación ultra rápida para no saturar la CPU
-      '-movflags', '+faststart',  // Permite reproducir el video en web sin descargarlo completo
+      '-y',
+      '-loglevel', 'error',
+      '-f', 'image2pipe',
+      '-vcodec', 'mjpeg',
+      '-r', '15',
+      '-i', '-',
+      '-vcodec', 'libx264',
+      '-pix_fmt', 'yuv420p',
+      '-preset', 'ultrafast',
+      '-tune', 'zerolatency',
+      '-movflags', '+faststart',
       filePath
     ];
 
-    const ffmpegProcess = spawn(ffmpegBinary, ffmpegArgs);
+    const proc = spawn(ffmpegBinary, ffmpegArgs);
+    let lastErrorOutput = '';
 
-    // 1. Manejo de error si el ejecutable de FFmpeg falla o no se encuentra en el sistema
-    ffmpegProcess.on('error', (err) => {
-      console.error(`[GRABADOR CRÍTICO] Error al iniciar proceso FFmpeg para casillero ${boxId}:`, err.message);
-      delete activeSessions[boxId];
-    });
-
-    // 2. Control de error en la tubería de entrada (stdin)
-    ffmpegProcess.stdin.on('error', (err) => {
-      if (err.code !== 'EPIPE') {
-        console.error(`[GRABADOR Stdin Error Casillero ${boxId}]:`, err.message);
-      }
-    });
-
-    // 3. Drenar stderr para evitar que se llene el buffer de Windows y congele la grabación
-    ffmpegProcess.stderr.on('data', () => {
-      // Flujo consumido silenciosamente para mantener la tubería despejada
-    });
-
-    ffmpegProcess.on('close', (code) => {
-      if (code === 0) {
-        console.log(`[GRABADOR] Video guardado exitosamente: ${filename}`);
-      } else {
-        console.warn(`[GRABADOR] FFmpeg cerró para casillero ${boxId} con código: ${code}`);
-      }
-    });
-
-    activeSessions[boxId] = {
-      process: ffmpegProcess,
-      filePath: filePath,
-      filename: filename,
+    const session = {
+      process: proc,
+      filePath,
+      filename,
       url: `/recordings/${filename}`,
-      startTime: Date.now()
+      startTime: Date.now(),
+      isDraining: false,
+      closePromise: null
     };
 
-    console.log(`[GRABADOR] Iniciando grabación para casillero ${boxId} -> ${filename}`);
+    session.closePromise = new Promise((resolve) => {
+      proc.on('close', (code) => {
+        if (code === 0) {
+          logger.info('GRABADOR', `Video guardado correctamente: ${filename}`);
+          resolve({
+            filename,
+            filePath,
+            url: `/recordings/${filename}`,
+            durationMs: Date.now() - session.startTime,
+            success: true
+          });
+        } else {
+          logger.warn('GRABADOR', `FFmpeg cerró con código ${code} en sesión #${boxId}: ${lastErrorOutput}`);
+          resolve({
+            filename,
+            filePath,
+            url: `/recordings/${filename}`,
+            durationMs: Date.now() - session.startTime,
+            success: false
+          });
+        }
+      });
+    });
+
+    proc.stdin.on('drain', () => {
+      session.isDraining = false;
+    });
+
+    proc.stdin.on('error', (err) => {
+      if (err.code !== 'EPIPE') {
+        logger.error('GRABADOR', `Stdin Error en sesión #${boxId}`, err);
+      }
+    });
+
+    proc.stderr.on('data', (chunk) => {
+      lastErrorOutput = chunk.toString().slice(-300);
+    });
+
+    proc.on('error', (err) => {
+      logger.error('GRABADOR', `Error al invocar FFmpeg para sesión #${boxId}`, err);
+      activeSessions.delete(boxId);
+    });
+
+    activeSessions.set(boxId, session);
+    logger.info('GRABADOR', `Iniciando grabación para sesión #${boxId} -> ${filename}`);
   },
 
-  // Escribe un fotograma JPEG binario en la tubería de FFmpeg
   addFrame(boxId, frameBuffer) {
-    const session = activeSessions[boxId];
-    if (session && session.process && session.process.stdin && session.process.stdin.writable) {
-      session.process.stdin.write(frameBuffer);
+    const session = activeSessions.get(boxId);
+    if (!session || !session.process.stdin.writable) return;
+
+    if (session.isDraining) {
+      return;
+    }
+
+    const canWriteMore = session.process.stdin.write(frameBuffer);
+    if (!canWriteMore) {
+      session.isDraining = true;
     }
   },
 
-  // Detiene la sesión y finaliza el empaquetado del archivo .mp4
-  stop(boxId) {
-    const session = activeSessions[boxId];
+  async stop(boxId) {
+    const session = activeSessions.get(boxId);
     if (!session) return null;
 
-    console.log(`[GRABADOR] Finalizando grabación de casillero ${boxId}...`);
+    activeSessions.delete(boxId);
+    logger.info('GRABADOR', `Finalizando grabación de sesión #${boxId}...`);
 
     try {
       if (session.process.stdin.writable) {
-        session.process.stdin.end(); // Cierra el flujo para escribir los metadatos finales del MP4
+        session.process.stdin.end();
       }
     } catch (err) {
-      console.error(`[GRABADOR] Error al cerrar stdin del casillero ${boxId}:`, err.message);
+      logger.error('GRABADOR', `Error cerrando stdin de sesión #${boxId}`, err);
     }
 
-    const savedInfo = {
-      filename: session.filename,
-      filePath: session.filePath,
-      url: session.url,
-      durationMs: Date.now() - session.startTime
-    };
+    // Watchdog de 4 segundos
+    const watchdogPromise = new Promise((resolve) => {
+      setTimeout(() => {
+        try {
+          if (!session.process.killed) {
+            logger.warn('GRABADOR', `Watchdog: FFmpeg no finalizó a tiempo para sesión #${boxId}. Enviando SIGKILL.`);
+            session.process.kill('SIGKILL');
+          }
+        } catch (_) {}
+        resolve({
+          filename: session.filename,
+          filePath: session.filePath,
+          url: session.url,
+          durationMs: Date.now() - session.startTime,
+          success: false
+        });
+      }, 4000);
+    });
 
-    delete activeSessions[boxId];
-    return savedInfo;
+    return Promise.race([session.closePromise, watchdogPromise]);
   },
 
-  // Verifica si hay una grabación en progreso para este casillero
   isRecording(boxId) {
-    return !!activeSessions[boxId];
+    return activeSessions.has(boxId);
   }
 };
+
+function cleanup() {
+  for (const [boxId, session] of activeSessions.entries()) {
+    try {
+      logger.warn('GRABADOR', `Limpieza: cerrando proceso FFmpeg para sesión #${boxId}`);
+      session.process.kill('SIGKILL');
+    } catch (_) {}
+  }
+}
+
+process.on('SIGINT', cleanup);
+process.on('SIGTERM', cleanup);
+process.on('exit', cleanup);
 
 module.exports = VideoRecorder;

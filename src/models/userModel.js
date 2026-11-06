@@ -23,6 +23,21 @@ const UserModel = {
   },
 
   /**
+   * Obtiene la lista de administradores y operadores activos con correo para reportes periódicos
+   */
+  async getReportRecipients() {
+    const [rows] = await db.query(
+      `SELECT id, username, email, role, phone 
+       FROM users 
+       WHERE role IN ('admin', 'operador') 
+         AND is_active = 1 
+         AND email IS NOT NULL 
+         AND email != ''`
+    );
+    return rows;
+  },
+
+  /**
    * Busca un usuario por su identificador único (ID)
    */
   async findById(id) {
